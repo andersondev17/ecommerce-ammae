@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import SocialProviders from "./SocialProviders";
+import { useCartStore } from "@/store/cart.store";
 
 type Props = {
   mode: "sign-in" | "sign-up";
@@ -13,16 +14,27 @@ type Props = {
 export default function AuthForm({ mode, onSubmit }: Props) {
   const [show, setShow] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { mergeGuestCart } = useCartStore();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const formData = new FormData(e.currentTarget);
+    const redirectTo = searchParams.get('redirect') || '/';
 
     try {
       const result = await onSubmit(formData);
 
-      if(result?.ok) router.push("/");
+      if(result?.ok) {
+        // If user successfully logged in and we have a userId, merge guest cart
+        if (result.userId) {
+          await mergeGuestCart(result.userId);
+        }
+
+        // Redirect to the specified URL or home page
+        router.push(redirectTo);
+      }
     } catch (e) {
       console.log("error", e);
     }

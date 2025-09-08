@@ -1,8 +1,10 @@
 "use client";
 
+import { useCartStore } from "@/store/cart.store";
+import { ShoppingBagIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const SUBCATEGORIES = {
   men: ["shoes", "jeans", "camisetas", "hoodies", "accesorios"],
@@ -21,7 +23,7 @@ const NAV_LINKS = [
 const formatCategory = (cat: string): string => {
   const labels: Record<string, string> = {
     shoes: "Shoes", jeans: "Jeans", blusas: "Blusas",
-    vestidos: "Vestidos", camisetas: "Camisetas", 
+    vestidos: "Vestidos", camisetas: "Camisetas",
     hoodies: "Hoodies", accesorios: "Accesorios"
   };
   return labels[cat] || cat;
@@ -30,12 +32,30 @@ const formatCategory = (cat: string): string => {
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [mobileSubmenu, setMobileSubmenu] = useState<string | null>(null);
+  const [itemCount, setItemCount] = useState(0);
+
+  // Access store methods and state
+  const { items, initialize, isInitialized, getItemCount } = useCartStore();
+
+  // Update item count when items change
+  useEffect(() => {
+    setItemCount(getItemCount());
+  }, [items, getItemCount]);
+
+  // Initialize cart on mount
+  useEffect(() => {
+    if (!isInitialized) {
+      initialize().catch(error => {
+        console.error('Failed to initialize cart:', error);
+      });
+    }
+  }, [initialize, isInitialized]);
 
   return (
     <>
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          
+
           <Link href="/" className="flex items-center">
             <Image src="/logo.svg" alt="AMMAE" width={80} height={60} priority className="invert" />
           </Link>
@@ -70,23 +90,26 @@ export default function Navbar() {
             ))}
           </ul>
 
-          <div className="hidden md:flex items-center gap-6">
-            <button className="text-sm font-medium text-gray-900 hover:text-gray-600 transition-colors">
-              Search
-            </button>
-            <button className="text-sm font-medium text-gray-900 hover:text-gray-600 transition-colors">
-              Cart (2)
+          <div className="flex items-center gap-4">
+            <Link href="/cart" className="relative flex items-center gap-2" aria-label="View cart">
+              <ShoppingBagIcon className="h-5 w-5 text-gray-900 hover:text-gray-600 transition-colors" />
+              {itemCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-orange text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium min-w-[20px]">
+                  {itemCount > 99 ? "99+" : itemCount}
+                </span>
+              )}
+            </Link>
+
+            <button
+              className={`md:hidden flex items-end menu-button ${open ? 'open' : ''}`}
+              onClick={() => setOpen(!open)}
+              aria-expanded={open}
+              aria-label="Toggle menu"
+            >
+              <div className="menu-burger" />
             </button>
           </div>
 
-          <button
-            className={`md:hidden flex items-center justify-items-center menu-button ${open ? 'open' : ''}`}
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            aria-label="Toggle menu"
-          >
-            <div className="menu-burger" />
-          </button>
         </nav>
 
         {open && (
@@ -132,10 +155,16 @@ export default function Navbar() {
                   )}
                 </div>
               ))}
-              
+
               <div className="flex justify-between pt-3 border-t border-gray-100">
                 <button className="text-sm font-medium">Search</button>
-                <button className="text-sm font-medium">Cart (2)</button>
+                <Link
+                  href="/cart"
+                  className="text-sm font-medium"
+                  onClick={() => setOpen(false)}
+                >
+                  Cart ({itemCount})
+                </Link>
               </div>
             </div>
           </div>

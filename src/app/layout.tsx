@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Jost } from "next/font/google";
 import "./globals.css";
+import {ReactNode} from "react";
 
 const jost = Jost({
   variable: "--font-jost",
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootShell({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: ReactNode;
 }>) {
   return (
     <html lang="en">

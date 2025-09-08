@@ -1,6 +1,7 @@
 import Image from "next/image";
+import { ReactNode } from "react";
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <main className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
       <section className="hidden lg:flex flex-col justify-between bg-dark-900 text-light-100 p-10">

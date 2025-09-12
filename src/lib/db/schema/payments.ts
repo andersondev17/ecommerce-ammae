@@ -1,9 +1,9 @@
-import { pgEnum, pgTable, timestamp, uuid, text } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import { pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { orders } from './orders';
 
-export const paymentMethodEnum = pgEnum('payment_method', ['stripe', 'paypal', 'cod']);
+export const paymentMethodEnum = pgEnum('payment_method', ['stripe', 'paypal', 'cod', 'mercadopago', 'whatsapp']);
 export const paymentStatusEnum = pgEnum('payment_status', ['initiated', 'completed', 'failed']);
 
 export const payments = pgTable('payments', {
@@ -24,7 +24,7 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
 
 export const insertPaymentSchema = z.object({
   orderId: z.string().uuid(),
-  method: z.enum(['stripe', 'paypal', 'cod']),
+method: z.enum(['stripe', 'paypal', 'cod', 'mercadopago', 'whatsapp']),
   status: z.enum(['initiated', 'completed', 'failed']).optional(),
   paidAt: z.date().optional().nullable(),
   transactionId: z.string().optional().nullable(),

@@ -14,7 +14,7 @@ export function OrderSummary({ subtotal = 0, total = 0, isLoading, onCheckout }:
                 <div className="space-y-4 text-sm">
                     <div className="flex justify-between text-gray-700">
                         <span>Subtotal</span>
-                        <span>${subtotal.toFixed(2)}</span>
+                        <span>${subtotal}</span>
                     </div>
 
                     <div className="flex justify-between text-gray-700">
@@ -25,7 +25,7 @@ export function OrderSummary({ subtotal = 0, total = 0, isLoading, onCheckout }:
                     <div className="border-t border-gray-200 pt-4">
                         <div className="flex justify-between font-semibold text-gray-900 text-base">
                             <span>Total</span>
-                            <span>${total.toFixed(2)}</span>
+                            <span>${total}</span>
                         </div>
                     </div>
                 </div>

@@ -14,7 +14,7 @@ const Home = async () => {
           {products.map((p) => {
             const price =
               p.minPrice !== null && p.maxPrice !== null && p.minPrice !== p.maxPrice
-                ? `$${p.minPrice.toFixed(2)} - $${p.maxPrice.toFixed(2)}`
+                ? `$${p.minPrice} - $${p.maxPrice}`
                 : p.minPrice !== null
                   ? p.minPrice
                   : undefined;

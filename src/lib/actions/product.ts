@@ -167,7 +167,7 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
       id: products.id,
       name: products.name,
       createdAt: products.createdAt,
-      subtitle: genders.label,
+      subtitle: sql`concat(${genders.label}, ' ', ${categories.name})`,
       minPrice: priceAgg.minPrice,
       maxPrice: priceAgg.maxPrice,
       imageUrl: imageAgg,
@@ -179,7 +179,7 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
     .leftJoin(brands, eq(brands.id, products.brandId))
     .leftJoin(categories, eq(categories.id, products.categoryId))
     .where(baseWhere)
-    .groupBy(products.id, products.name, products.createdAt, genders.label)
+    .groupBy(products.id, products.name, products.createdAt, genders.label, categories.name)
     .orderBy(primaryOrder, desc(products.createdAt), asc(products.id))
     .limit(limit)
     .offset(offset);
@@ -201,7 +201,7 @@ export async function getAllProducts(filters: NormalizedProductFilters): Promise
     minPrice: r.minPrice === null ? null : Number(r.minPrice),
     maxPrice: r.maxPrice === null ? null : Number(r.maxPrice),
     createdAt: r.createdAt,
-    subtitle: r.subtitle ? `${r.subtitle} Shoes` : null,
+    subtitle: r.subtitle ? `${r.subtitle}` : null,
   }));
 
   const totalCount = countRows[0]?.cnt ?? 0;

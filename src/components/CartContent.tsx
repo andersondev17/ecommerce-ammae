@@ -1,11 +1,10 @@
 "use client";
 
-import { getCurrentUser } from "@/lib/auth/actions";
 import { CartData } from "@/lib/actions/cart";
 import { useCartStore } from "@/store/cart.store";
-import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { CartItem, CartSkeleton, EmptyCart, OrderSummary } from "./index";
+import { CartSummary } from "./checkout/CartSummary";
+import { CartItem, CartSkeleton, EmptyCart } from "./index";
 
 interface CartContentProps {
     initialCart: {
@@ -15,19 +14,14 @@ interface CartContentProps {
 }
 
 export default function CartContent({ initialCart }: CartContentProps) {
-    const router = useRouter();
-    const { items, isLoading, isInitialized, updateQuantity, removeItem, initialize, setItems, getItemCount, getSubtotal, getTotal } = useCartStore();
-       // Calcular valores computados
+    const { items, isLoading, isInitialized, updateQuantity, removeItem, initialize, setItems, getItemCount } = useCartStore();
+    
     const itemCount = getItemCount();
-    const subtotal = getSubtotal();
-    const total = getTotal();
-
-    // Inicializar el store con datos del servidor
+    
     useEffect(() => {
         if (initialCart.success && !isInitialized) {
             setItems(initialCart.data.items);
         } else if (!isInitialized) {
-            // Use an async IIFE to properly handle the Promise
             (async () => {
                 await initialize();
             })();
@@ -42,15 +36,6 @@ export default function CartContent({ initialCart }: CartContentProps) {
         }
     };
 
-    const handleCheckout = async () => {
-        const user = await getCurrentUser();
-        if (!user) {
-            router.push("/auth?redirect=/checkout");
-        } else {
-            router.push("/checkout");
-        }
-    };
-
     if (isLoading && !items.length) {
         return <CartSkeleton />;
     }
@@ -58,6 +43,20 @@ export default function CartContent({ initialCart }: CartContentProps) {
     if (!items.length) {
         return <EmptyCart />;
     }
+
+    // Convert items to cents for proper calculation (assuming backend stores in cents)
+    const itemsInCents = items.map(item => ({
+        ...item,
+        price: item.price , // Convert to cents
+        salePrice: item.salePrice ? item.salePrice  : undefined
+    }));
+
+    const subtotal = itemsInCents.reduce((sum, item) => {
+        const price = item.salePrice ?? item.price;
+        return sum + (price * item.quantity);
+    }, 0);
+
+    const total = subtotal + 200; // Add shipping in cents
 
     return (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
@@ -75,12 +74,9 @@ export default function CartContent({ initialCart }: CartContentProps) {
                         />
                     ))}
                 </div>
-
-                <OrderSummary
-                    subtotal={subtotal}
-                    total={total}
-                    isLoading={isLoading}
-                    onCheckout={handleCheckout}
+                <CartSummary
+                    items={itemsInCents}
+                    amount={total}
                 />
             </div>
         </div>

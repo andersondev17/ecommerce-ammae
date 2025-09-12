@@ -8,7 +8,7 @@ export function EmptyCart() {
                 <p className="text-gray-600 mb-4">Your cart is empty</p>
                 <Link
                     href="/products"
-                    className="bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition-colors"
+                    className="bg-dark-900 text-light-100 px-6 py-2 rounded-full hover:bg-gray-800 transition-colors"
                 >
                     Continue Shopping
                 </Link>

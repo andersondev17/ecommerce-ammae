@@ -45,12 +45,12 @@ function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-// ✅ CATEGORY-SPECIFIC CONFIGURATIONS
+// ✅ CATEGORY CONFIGURATIONS
 const CATEGORY_CONFIGS = {
   shoes: {
     sizeType: 'numeric',
     sizeRange: ['7', '8', '9', '10', '11', '12'],
-    priceRange: [80, 200],
+    priceRange: [320000, 800000], // 320k-800k COP
     imageFolder: 'shoes',
     imageCount: 15,
     names: [
@@ -61,7 +61,7 @@ const CATEGORY_CONFIGS = {
   jeans: {
     sizeType: 'clothing',
     sizeRange: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
-    priceRange: [45, 120],
+    priceRange: [180000, 480000], //180k-480k COP
     imageFolder: 'jeans',
     imageCount: 10,
     names: [
@@ -72,7 +72,7 @@ const CATEGORY_CONFIGS = {
   blusas: {
     sizeType: 'clothing',
     sizeRange: ['XS', 'S', 'M', 'L', 'XL'],
-    priceRange: [25, 85],
+    priceRange: [100000, 340000], // 100k-340k COP
     imageFolder: 'blusas',
     imageCount: 8,
     names: [
@@ -83,7 +83,7 @@ const CATEGORY_CONFIGS = {
   vestidos: {
     sizeType: 'clothing',
     sizeRange: ['XS', 'S', 'M', 'L', 'XL'],
-    priceRange: [60, 180],
+    priceRange: [240000, 720000], // 240k-720k COP
     imageFolder: 'vestidos',
     imageCount: 12,
     names: [
@@ -94,7 +94,7 @@ const CATEGORY_CONFIGS = {
   camisetas: {
     sizeType: 'clothing',
     sizeRange: ['S', 'M', 'L', 'XL', 'XXL'],
-    priceRange: [15, 45],
+    priceRange: [60000, 180000], // 60k-180k COP
     imageFolder: 'tshirts',
     imageCount: 8,
     names: [
@@ -105,7 +105,7 @@ const CATEGORY_CONFIGS = {
   hoodies: {
     sizeType: 'clothing',
     sizeRange: ['S', 'M', 'L', 'XL', 'XXL'],
-    priceRange: [35, 95],
+    priceRange: [140000, 380000], // 140k-380k COP
     imageFolder: 'hoodies',
     imageCount: 6,
     names: [
@@ -116,7 +116,7 @@ const CATEGORY_CONFIGS = {
   accesorios: {
     sizeType: 'onesize',
     sizeRange: ['One Size'],
-    priceRange: [10, 60],
+    priceRange: [40000, 240000], // 40k-240k COP
     imageFolder: 'accessories',
     imageCount: 10,
     names: [
@@ -240,7 +240,7 @@ async function seed() {
 
     // ✅ STEP 7: SEED PRODUCTS BY CATEGORY
     log('🛍️ Creating products for all categories...');
-    
+
     for (const [categorySlug, config] of Object.entries(CATEGORY_CONFIGS)) {
       const category = allCategories.find(c => c.slug === categorySlug);
       if (!category) {
@@ -249,7 +249,7 @@ async function seed() {
       }
 
       log(`Creating products for ${categorySlug}...`);
-      
+
       // Create upload directory for this category
       const categoryUploadDir = join(uploadsRoot, config.imageFolder);
       if (!existsSync(categoryUploadDir)) {
@@ -257,21 +257,21 @@ async function seed() {
       }
 
       const productsToCreate = categorySlug === 'shoes' ? 8 : 6; // More shoes, fewer clothing items
-      
+
       for (let i = 0; i < productsToCreate; i++) {
         const name = config.names[i % config.names.length];
-        
+
         // Smart gender assignment
-        const genderOptions = categorySlug === 'blusas' || categorySlug === 'vestidos' 
+        const genderOptions = categorySlug === 'blusas' || categorySlug === 'vestidos'
           ? allGenders.filter(g => g.slug === 'women')
           : categorySlug === 'camisetas' || categorySlug === 'hoodies'
-          ? allGenders.filter(g => g.slug !== 'women')
-          : allGenders;
-        
+            ? allGenders.filter(g => g.slug !== 'women')
+            : allGenders;
+
         const gender = genderOptions[randInt(0, genderOptions.length - 1)];
-        
+
         // Brand assignment
-        const brand = categorySlug === 'shoes' 
+        const brand = categorySlug === 'shoes'
           ? allBrands.find(b => b.slug === 'nike')
           : allBrands.find(b => b.slug === 'ammae');
 
@@ -290,10 +290,10 @@ async function seed() {
         const insertedProduct = (retP as ProductRow[])[0];
 
         // ✅ SIZE-AWARE VARIANT CREATION
-        const availableSizes = allSizes.filter(s => 
+        const availableSizes = allSizes.filter(s =>
           (config.sizeRange as readonly string[]).includes(s.name)
         );
-        
+
         const colorChoices = pick(allColors, randInt(2, Math.min(4, allColors.length)));
         const sizeChoices = pick(availableSizes, randInt(2, Math.min(4, availableSizes.length)));
 
@@ -303,23 +303,24 @@ async function seed() {
         for (const color of colorChoices) {
           for (const size of sizeChoices) {
             const [minPrice, maxPrice] = config.priceRange;
-            const priceNum = Number((randInt(minPrice, maxPrice) + 0.99).toFixed(2));
-            const discountedNum = Math.random() < 0.3 ? Number((priceNum - randInt(5, 15)).toFixed(2)) : null;
-            
+            const priceNum = Math.round(randInt(minPrice, maxPrice) / 1000) * 1000;
+            const discountedNum = Math.random() < 0.3
+              ? Math.round((priceNum - randInt(20000, 50000)) / 1000) * 1000
+              : null;
             const sku = `${brand?.slug?.toUpperCase() || 'AMMAE'}-${insertedProduct.id.slice(0, 6)}-${color.slug.toUpperCase()}-${size.slug.toUpperCase()}`;
-            
+
             const variant = insertVariantSchema.parse({
               productId: insertedProduct.id,
               sku,
-              price: priceNum.toFixed(2),
-              salePrice: discountedNum !== null ? discountedNum.toFixed(2) : undefined,
+              price: priceNum.toString(),
+              salePrice: discountedNum !== null ? discountedNum.toString() : undefined,
               colorId: color.id,
               sizeId: size.id,
               inStock: randInt(5, 30),
               weight: config.sizeType === 'onesize' ? 0.2 : Number((Math.random() * 1 + 0.3).toFixed(2)),
               dimensions: { length: 30, width: 20, height: 12 },
             });
-            
+
             const retV = await db.insert(productVariants).values(variant as InsertVariant).returning();
             const created = (retV as VariantRow[])[0];
             variantIds.push(created.id);
@@ -336,7 +337,7 @@ async function seed() {
         const imageIndex = (i % config.imageCount) + 1;
         const imageName = `${config.imageFolder}-${imageIndex}.jpg`;
         const destName = `${insertedProduct.id}-${imageName}`;
-        
+
         // Since we don't have actual images, create placeholder path
         const img: InsertProductImage = insertProductImageSchema.parse({
           productId: insertedProduct.id,
@@ -347,10 +348,10 @@ async function seed() {
         await db.insert(productImages).values(img);
 
         // ✅ COLLECTION ASSIGNMENT
-        const collectionsForProduct = Math.random() < 0.3 
+        const collectionsForProduct = Math.random() < 0.3
           ? [allCollections[randInt(0, allCollections.length - 1)]]
           : pick(allCollections, randInt(1, 2));
-        
+
         for (const col of collectionsForProduct) {
           await db.insert(productCollections).values({
             productId: insertedProduct.id,
@@ -364,7 +365,7 @@ async function seed() {
 
     log('🎉 Enhanced multi-category seeding complete!');
     log(`📊 Created products across ${Object.keys(CATEGORY_CONFIGS).length} categories`);
-    
+
   } catch (e) {
     err('❌ Seeding failed:', e);
     process.exitCode = 1;

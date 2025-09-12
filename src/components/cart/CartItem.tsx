@@ -30,10 +30,10 @@ export function CartItem({ item, isLoading, onQuantityChange, onRemove }: CartIt
           {item.size && `Size: ${item.size}`}
         </p>
         <p className="font-semibold text-gray-900 mt-2">
-          ${(item.salePrice ?? item.price).toFixed(2)}
+          ${(item.salePrice ?? item.price)}
           {item.salePrice && (
             <span className="ml-2 text-sm text-gray-500 line-through">
-              ${item.price.toFixed(2)}
+              ${item.price}
             </span>
           )}
         </p>

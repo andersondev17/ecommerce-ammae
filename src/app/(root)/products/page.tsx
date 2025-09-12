@@ -1,8 +1,8 @@
 import { Card } from "@/components";
 import Filters from "@/components/Filters";
 import Sort from "@/components/Sort";
-import { parseFilterParams } from "@/lib/utils/query";
 import { getAllProducts } from "@/lib/actions/product";
+import { parseFilterParams } from "@/lib/utils/query";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -62,7 +62,7 @@ export default async function ProductsPage({
               {products.map((p) => {
                 const price =
                   p.minPrice !== null && p.maxPrice !== null && p.minPrice !== p.maxPrice
-                    ? `$${p.minPrice.toFixed(2)} - $${p.maxPrice.toFixed(2)}`
+                    ? `$${p.minPrice} - $${p.maxPrice}`
                     : p.minPrice !== null
                     ? p.minPrice
                     : undefined;

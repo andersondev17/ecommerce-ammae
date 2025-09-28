@@ -1,9 +1,7 @@
-// src/components/AddToCartButton.tsx
 "use client";
 
 import { useCartStore } from "@/store/cart.store";
 import { useSizeStore } from "@/store/size";
-import { ShoppingBag } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -44,10 +42,9 @@ export function AddToCartButton({
         <button
             onClick={handleAddToCart}
             disabled={disabled || isAdding}
-            className="flex items-center justify-center gap-2 rounded-full bg-dark-900 px-6 py-4 text-body-medium text-light-100 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500] disabled:opacity-50"
+            className="flex items-center justify-center gap-2 font-roboto-slab rounded-2xl bg-dark-900 border-2 border-dark-900 px-6 py-3 text-body-medium text-light-100 transition-colors hover:bg-light-100 hover:text-dark-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500] disabled:opacity-50"
         >
-            <ShoppingBag className="h-5 w-5" />
-            {isAdding ? "Adding..." : "Add to Bag"}
+            {isAdding ? "Añadiendo..." : "Añadir a tu selección"}
         </button>
     );
 }

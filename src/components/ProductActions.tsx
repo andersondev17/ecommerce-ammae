@@ -64,7 +64,7 @@ export default function ProductActions({
   return (
     <div className="flex flex-col gap-6">
       <ColorSwatches productId={productId} variants={galleryVariants} />
-      <SizePicker productId={productId} />
+      <SizePicker productId={productId}  variants={variants} />
 
       <div className="flex flex-col gap-3">
         <AddToCartButton
@@ -72,9 +72,9 @@ export default function ProductActions({
           productVariantId={selectedVariantId || ""}
           disabled={!selectedVariantId}
         />
-        <button className="flex items-center justify-center gap-2 rounded-full border border-light-300 px-6 py-4 text-body-medium text-dark-900 transition hover:border-dark-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500]">
+        <button className="flex items-center justify-center gap-2 rounded-full border border-light-300 px-6 py-3 text-body-medium text-dark-900 transition hover:border-dark-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-black">
           <Heart className="h-5 w-5" />
-          Favorite
+          Favorito
         </button>
       </div>
     </div>

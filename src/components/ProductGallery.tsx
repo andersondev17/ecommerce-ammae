@@ -1,9 +1,9 @@
 "use client";
 
+import { useVariantStore } from "@/store/variant";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
-import { useVariantStore } from "@/store/variant";
 
 type Variant = {
   color: string;
@@ -65,6 +65,8 @@ export default function ProductGallery({
     return () => window.removeEventListener("keydown", onKey);
   }, [go]);
 
+  const isVideo = (src: string) => /\.(mp4|webm|ogg)$/i.test(src);
+
   return (
     <section className={`flex w-full flex-col gap-4 lg:flex-row ${className}`}>
       <div className="order-2 flex gap-3 overflow-x-auto lg:order-1 lg:flex-col">
@@ -75,22 +77,21 @@ export default function ProductGallery({
             onClick={() => setActiveIndex(i)}
             className={`relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-light-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500] ${i === activeIndex ? "ring-[--color-dark-500]" : ""}`}
           >
-            <Image src={src} alt={`Thumbnail ${i + 1}`} fill sizes="64px" className="object-cover" />
+            {isVideo(src) ?
+              <video src={src} className="w-full h-full object-cover" muted /> :
+              <Image src={src} alt={`Thumbnail ${i + 1}`} fill sizes="64px" className="object-contain" />
+            }
           </button>
         ))}
       </div>
 
-      <div ref={mainRef} className="order-1 relative w-full h-[500px] overflow-hidden rounded-xl bg-light-200 lg:order-2">
+      <div ref={mainRef} className="order-1 relative w-full h-dvh overflow-hidden rounded-xl bg-light-200 lg:order-2">
         {images.length > 0 ? (
           <>
-            <Image
-              src={images[activeIndex]}
-              alt="Product image"
-              fill
-              sizes="(min-width:1024px) 720px, 100vw"
-              className="object-cover"
-              priority
-            />
+            {isVideo(images[activeIndex]) ?
+              <video src={images[activeIndex]} className="w-full h-full object-contain" autoPlay muted loop playsInline /> :
+              <Image src={images[activeIndex]} alt="Product image" fill sizes="(min-width:1024px) 720px, 100vw" className="object-contain" priority />
+            }
 
             <div className="absolute inset-0 flex items-center justify-between px-2">
               <button

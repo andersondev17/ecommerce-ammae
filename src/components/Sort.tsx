@@ -26,9 +26,9 @@ export default function Sort() {
 
   return (
     <label className="inline-flex items-center gap-2">
-      <span className="text-body text-dark-900">Sort by</span>
+      <span className="text-sm text-dark-900 font-roboto">Ordenar por</span>
       <select
-        className="rounded-md border border-light-300 bg-light-100 px-3 py-2 text-body"
+        className=" bg-light-100 px-3 py-2 font-light text-sm font-roboto"
         value={selected}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Sort products"

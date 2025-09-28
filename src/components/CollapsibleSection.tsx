@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import {ReactNode, useState} from "react";
+import { ReactNode, useState } from "react";
 
 export interface CollapsibleSectionProps {
   title: string;
@@ -27,7 +27,7 @@ export default function CollapsibleSection({
         className="flex w-full items-center justify-between gap-4 py-5 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500]"
         aria-expanded={open}
       >
-        <span className="text-body-medium text-dark-900">{title}</span>
+        <span className=" text-dark-900">{title}</span>
         <span className="flex items-center gap-2">
           {rightMeta}
           <ChevronDown

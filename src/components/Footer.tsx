@@ -22,19 +22,19 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-12">
           <div className="flex items-start md:col-span-3">
-            <Image src="/logo.svg" alt="AMMAE" width={58} height={58} />
+            <Image src="/logo.png" className="invert" alt="AMMAE" width={120} height={90} />
           </div>
 
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:col-span-7">
             {columns.map((col) => (
               <div key={col.title}>
-                <h4 className="mb-4 text-heading-3">{col.title}</h4>
+                <h4 className="mb-4 text-heading-3 font-roboto-slab">{col.title}</h4>
                 <ul className="space-y-3">
                   {col.links.map((l) => (
                     <li key={l}>
                       <Link
                         href="#"
-                        className="text-body text-light-400 hover:text-light-300"
+                        className="text-body font-roboto text-light-400 hover:text-light-300"
                       >
                         {l}
                       </Link>
@@ -69,10 +69,10 @@ export default function Footer() {
           <div className="flex items-center gap-3 text-caption">
             <Image src="/globe.svg" alt="" width={16} height={16} />
             <span>COL</span>
-            <span>  © {new Date().getFullYear()} AMMAE, All rights reserved
+            <span className="font-roboto">  © {new Date().getFullYear()} AMMAE, All rights reserved
             </span>
           </div>
-          <ul className="flex items-center gap-6 text-caption">
+          <ul className="flex items-center gap-6 text-caption font-roboto">
             {["Guides", "Terms of Sale", "Terms of Use", "AMMAE Privacy Policy"].map((t) => (
               <li key={t}>
                 <Link href="#">{t}</Link>

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Jost } from "next/font/google";
+import { Roboto } from "next/font/google";
+import { ReactNode } from "react";
 import "./globals.css";
-import {ReactNode} from "react";
-
-const jost = Jost({
-  variable: "--font-jost",
+const roboto = Roboto({
+  weight: ['300', '400', '700'],
   subsets: ["latin"],
+  variable: '--font-roboto',
+  display: 'swap',
+  preload: true,
 });
 
 export const metadata: Metadata = {
@@ -19,8 +21,8 @@ export default function RootShell({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${jost.className} antialiased`}>{children}</body>
+    <html lang="es" className={`${roboto.variable}`}>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }

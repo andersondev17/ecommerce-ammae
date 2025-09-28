@@ -1,10 +1,10 @@
 "use client";
 
+import { useCartStore } from "@/store/cart.store";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import SocialProviders from "./SocialProviders";
-import { useCartStore } from "@/store/cart.store";
 
 type Props = {
   mode: "sign-in" | "sign-up";
@@ -43,19 +43,19 @@ export default function AuthForm({ mode, onSubmit }: Props) {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <p className="text-caption text-dark-700">
-          {mode === "sign-in" ? "Don’t have an account? " : "Already have an account? "}
+        <p className="text-caption text-dark-700 font-roboto">
+          {mode === "sign-in" ? "¿No tienes una cuenta?  " : "¿Ya tienes una cuenta? "}
           <Link href={mode === "sign-in" ? "/sign-up" : "/sign-in"} className="underline">
-            {mode === "sign-in" ? "Sign Up" : "Sign In"}
+            {mode === "sign-in" ? "Registrate" : "Inicia Sesión"}
           </Link>
         </p>
-        <h1 className="mt-3 text-heading-3 text-dark-900">
-          {mode === "sign-in" ? "Welcome Back!" : "Join AMMAE Today!"}
+        <h1 className="mt-3 text-heading-3 text-dark-900 font-roboto-slab">
+          {mode === "sign-in" ? "Bienvenido de nuevo!" : "Únete a AMMAE hoy"}
         </h1>
-        <p className="mt-1 text-body text-dark-700">
+        <p className="mt-1 text-body text-dark-700 font-roboto">
           {mode === "sign-in"
-            ? "Sign in to continue your journey"
-            : "Create your account to start your fashion journey"}
+            ? "Inicia sesión para continuar con tu compra"
+            : "Crea tu cuenta para empezar tu viaje de moda"}
         </p>
       </div>
 
@@ -63,8 +63,8 @@ export default function AuthForm({ mode, onSubmit }: Props) {
 
       <div className="flex items-center gap-4">
         <hr className="h-px w-full border-0 bg-light-300" />
-        <span className="shrink-0 text-caption text-dark-700">
-          Or {mode === "sign-in" ? "sign in" : "sign up"} with
+        <span className="shrink-0 text-caption text-dark-700 font-roboto">
+          O {mode === "sign-in" ? "inicia sesión" : "registrate"} con
         </span>
         <hr className="h-px w-full border-0 bg-light-300" />
       </div>
@@ -75,14 +75,14 @@ export default function AuthForm({ mode, onSubmit }: Props) {
       >
         {mode === "sign-up" && (
           <div className="space-y-1">
-            <label htmlFor="name" className="text-caption text-dark-900">
-              Name
+            <label htmlFor="name" className="text-caption text-dark-900 font-roboto">
+              Nombre
             </label>
             <input
               id="name"
               name="name"
               type="text"
-              placeholder="Enter your name"
+              placeholder="Ingresa tu nombre"
               className="w-full rounded-xl border border-light-300 bg-light-100 px-4 py-3 text-body text-dark-900 placeholder:text-dark-500 focus:outline-none focus:ring-2 focus:ring-dark-900/10"
               autoComplete="name"
             />
@@ -90,14 +90,14 @@ export default function AuthForm({ mode, onSubmit }: Props) {
         )}
 
         <div className="space-y-1">
-          <label htmlFor="email" className="text-caption text-dark-900">
-            Email
+          <label htmlFor="email" className="text-caption text-dark-900 font-roboto">
+            Correo electronico
           </label>
           <input
             id="email"
             name="email"
             type="email"
-            placeholder="johndoe@gmail.com"
+            placeholder="tu.email@dominio.com"
             className="w-full rounded-xl border border-light-300 bg-light-100 px-4 py-3 text-body text-dark-900 placeholder:text-dark-500 focus:outline-none focus:ring-2 focus:ring-dark-900/10"
             autoComplete="email"
             required
@@ -105,15 +105,15 @@ export default function AuthForm({ mode, onSubmit }: Props) {
         </div>
 
         <div className="space-y-1">
-          <label htmlFor="password" className="text-caption text-dark-900">
-            Password
+          <label htmlFor="password" className="text-caption text-dark-900 font-roboto">
+            Contraseña
           </label>
           <div className="relative">
             <input
               id="password"
               name="password"
               type={show ? "text" : "password"}
-              placeholder="minimum 8 characters"
+              placeholder="Ingresa tu contraseña"
               className="w-full rounded-xl border border-light-300 bg-light-100 px-4 py-3 pr-12 text-body text-dark-900 placeholder:text-dark-500 focus:outline-none focus:ring-2 focus:ring-dark-900/10"
               autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
               minLength={8}
@@ -125,27 +125,27 @@ export default function AuthForm({ mode, onSubmit }: Props) {
               onClick={() => setShow((v) => !v)}
               aria-label={show ? "Hide password" : "Show password"}
             >
-              {show ? "Hide" : "Show"}
+              {show ? "Ocultar" : "Mostrar"}
             </button>
           </div>
         </div>
 
         <button
           type="submit"
-          className="mt-2 w-full rounded-full bg-dark-900 px-6 py-3 text-body-medium text-light-100 hover:bg-dark-700 focus:outline-none focus:ring-2 focus:ring-dark-900/20"
+          className="mt-2 w-full rounded-full bg-dark-900 px-6 py-3 text-body-medium text-light-100 hover:bg-dark-700 focus:outline-none focus:ring-2 focus:ring-dark-900/20 font-roboto-slab"
         >
           {mode === "sign-in" ? "Sign In" : "Sign Up"}
         </button>
 
         {mode === "sign-up" && (
-          <p className="text-center text-footnote text-dark-700">
-            By signing up, you agree to our{" "}
-            <a href="#" className="underline">
-              Terms of Service
+          <p className="text-center text-footnote text-dark-700 font-roboto">
+            Al registrarte, aceptas nuestros{" "}
+            <a href="#" className="underline hover:text-dark-900 transition-colors">
+              Términos de servicio
             </a>{" "}
-            and{" "}
-            <a href="#" className="underline">
-              Privacy Policy
+            y{" "}
+            <a href="#" className="underline hover:text-dark-900 transition-colors">
+              Política de privacidad
             </a>
           </p>
         )}

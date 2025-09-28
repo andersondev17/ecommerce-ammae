@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@tailwind utilities;
 
 @custom-variant dark (&:is(.dark *));
 
@@ -20,9 +21,18 @@
   --color-red: #d33918;
   --color-orange: #d37918;
 
-  /* Font family */
-  --font-jost: "Jost", sans-serif;
+  --color-primary-50: #FFF8DC;
+  --color-primary-100: #FFEFD5;
+  --color-primary-500: #B8860B;
+  --color-primary-600: #9A7209;
+  --color-primary-900: #433603;
 
+  /* Fonts custom */
+  --font-roboto: "roboto", sans-serif;
+  --font-fugaz: "fugaz", cursive;
+  --font-roboto-slab: "roboto-regular", serif;
+  --font-roboto-bold: "roboto-bold", serif;
+  --font-roboto-black: "roboto-black", serif;
   /* Heading sizes */
   --text-heading-1: 72px;
   --text-heading-1--line-height: 78px;
@@ -61,21 +71,41 @@
   --text-footnote--font-weight: 400;
 }
 
+@layer base {
+
+  @font-face {
+    font-family: "roboto-bold";
+    src: url("/fonts/RobotoSlab-Bold.ttf") format("truetype");
+  }
+
+  @font-face {
+    font-family: "roboto-black";
+    src: url("/fonts/RobotoSlab-Black.ttf") format("truetype");
+  }
+
+  @font-face {
+    font-family: "roboto-regular";
+    src: url("/fonts/RobotoSlab-Regular.ttf") format("truetype");
+  }
+
+
+  @font-face {
+    font-family: "fugaz";
+    src: url("/fonts/FugazOne-Regular.ttf") format("truetype");
+  }
+
+}
+
 .menu-button {
   justify-content: center;
   align-items: center;
   width: 44px;
   height: 44px;
   cursor: pointer;
-  border: 1px solid #e5e5e5;
   border-radius: 6px;
   background: white;
-  transition: border-color 0.2s ease;
 }
 
-.menu-button:hover {
-  border-color: #111111;
-}
 
 .menu-burger {
   position: relative;
@@ -124,13 +154,34 @@
   bottom: -2px;
   left: 0;
   width: 0;
-  height: 1px;
-  background: #111111;
-  transition: width 0.2s ease;
+  height: 0.5px;
+  background: #3a3a3a;
+  transition: width 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  /* Easing más suave */
 }
 
 .nav-link:hover::after {
   width: 100%;
+  transition: width 0.45s cubic-bezier(0.19, 1, 0.22, 1);
+
+}
+.mega-menu {
+  transition: max-height 0.5s ease-in-out, opacity 0.3s ease-in-out;
+  transition-delay: 0ms, 150ms;
+}
+
+.mega-menu.closing {
+  transition-delay: 150ms, 0ms;
+}
+
+.nav-hover-bridge {
+  position: absolute;
+  top: 100%;
+  left: -20px;
+  right: -20px;
+  height: 20px;
+  background: transparent;
+  z-index: 10;
 }
 
 @theme inline {
@@ -244,6 +295,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }

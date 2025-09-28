@@ -1,8 +1,11 @@
 "use client";
 
+import { formatCategory } from "@/lib/utils";
 import { getArrayParam, removeParams, toggleArrayParam } from "@/lib/utils/query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { IoFilter } from "react-icons/io5";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 
 const GENDERS = ["men", "women", "unisex"] as const;
 const SIZES = [
@@ -18,8 +21,8 @@ const PRICES = [
   { id: "150-", label: "Over $150" },
 ] as const;
 const CATEGORIES = [
-  "shoes", "jeans", "blusas", "vestidos",
-  "camisetas", "hoodies", "accesorios"
+   "jeans", "blusas", "vestidos",
+  "Camisetas", "hoodies"
 ] as const;
 
 type GroupKey = "gender" | "size" | "color" | "price" | "category";
@@ -30,13 +33,12 @@ export default function Filters() {
   const searchParams = useSearchParams();
   const search = useMemo(() => `?${searchParams.toString()}`, [searchParams]);
 
-  const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<GroupKey, boolean>>({
     gender: true,
-    size: true,
-    color: true,
-    price: true,
-    category: true,
+    size: false,
+    color: false,
+    price: false,
+    category: false,
   });
 
   const activeCounts = {
@@ -46,10 +48,6 @@ export default function Filters() {
     price: getArrayParam(search, "price").length,
     category: getArrayParam(search, "category").length,
   };
-
-  useEffect(() => {
-    setOpen(false);
-  }, [search]);
 
   const onToggle = (key: GroupKey, value: string) => {//push new url to update selected filter 
     const url = toggleArrayParam(pathname, search, key, value);
@@ -61,282 +59,173 @@ export default function Filters() {
     router.push(url, { scroll: false });
   };
 
-  const formatCategory = (cat: string): string => {
-    const categoryLabels: Record<string, string> = {
-      shoes: "Shoes",
-      jeans: "Jeans",
-      blusas: "Blouses",
-      vestidos: "Dresses",
-      camisetas: "T-Shirts",
-      hoodies: "Hoodies",
-      accesorios: "Accessories"
-    };
-    return categoryLabels[cat] || cat;
-  };
-  const Group = ({
-    title,
-    children,
-    k,
-  }: {
-    title: string;
-    children: import("react").ReactNode;
-    k: GroupKey;
-  }) => (
-    <div className="border-b border-light-300 py-4">
+  const Group = ({ title, children, k }: { title: string; children: React.ReactNode; k: GroupKey }) => (
+    <div className="border-b border-light-200 py-6">
       <button
-        className="flex w-full items-center justify-between text-body-medium text-dark-900"
+        className="flex w-full items-center justify-between text-left"
         onClick={() => setExpanded((s) => ({ ...s, [k]: !s[k] }))}
-        aria-expanded={expanded[k]}
-        aria-controls={`${k}-section`}
       >
-        <span>{title}</span>
-        <span className="text-caption text-dark-700">{expanded[k] ? "−" : "+"}</span>
+        <span className="text-base font-medium text-dark-900">{title}</span>
+        <span className="text-dark-500">
+          {expanded[k] ? "−" : "+"}
+        </span>
       </button>
-      <div id={`${k}-section`} className={`${expanded[k] ? "mt-3 block" : "hidden"}`}>
-        {children}
-      </div>
+
+      {expanded[k] && (
+        <div className="mt-4">
+          {children}
+        </div>
+      )}
     </div>
   );
 
   return (
-    <>
-      <div className="mb-4 flex items-center justify-between md:hidden">
-        <button
-          className="rounded-md border border-light-300 px-3 py-2 text-body-medium"
-          onClick={() => setOpen(true)}
-          aria-haspopup="dialog"
-        >
-          Filters
-        </button>
-        <button className="text-caption text-dark-700 underline" onClick={clearAll}>
-          Clear all
-        </button>
+    <Sheet>
+      <div className="flex items-center justify-between">
+        <SheetTrigger asChild>
+          <button className="flex items-center gap-2  px-4 py-2 text-sm font-roboto transition-colors hover:text-light-50">
+            <IoFilter size={16} />
+            Filtros 
+          </button>
+        </SheetTrigger>
       </div>
 
-      <aside className="sticky top-20 hidden h-fit min-w-60 rounded-lg border border-light-300 bg-light-100 p-4 md:block">
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-body-medium text-dark-900">Filters</h3>
-          <button className="text-caption text-dark-700 underline" onClick={clearAll}>
-            Clear all
-          </button>
-        </div>
+      <SheetContent side="left" className="w-[400px] sm:w-[400px] bg-white p-0">
+        <SheetHeader className="px-6 py-4 border-b border-light-200 flex flex-row items-center justify-between">
+          <SheetTitle className="text-lg font-medium">Filtros</SheetTitle>
+          {Object.values(activeCounts).some(count => count > 0) && (
+            <button
+              onClick={clearAll}
+              className="text-sm text-dark-600 hover:text-dark-900 underline font-roboto-slab pt-4"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </SheetHeader>
 
-        <Group title={`Categories ${activeCounts.category ? `(${activeCounts.category})` : ""}`} k="category">
-          <ul className="grid grid-cols-2 gap-2">
-            {CATEGORIES.map((cat) => {
-              const checked = getArrayParam(search, "category").includes(cat);
-              return (
-                <li key={cat} className="flex items-center gap-2">
-                  <input
-                    id={`category-${cat}`}
-                    type="checkbox"
-                    className="h-4 w-4 accent-dark-900"
-                    checked={checked}
-                    onChange={() => onToggle("category", cat)}
-                  />
-                  <label htmlFor={`category-${cat}`} className="text-body text-dark-900">
-                    {formatCategory(cat)}
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </Group>
+        <div className="px-6 py-2 space-y-0 max-h-[calc(100vh-160px)] overflow-y-auto">
 
-        <Group title={`Gender ${activeCounts.gender ? `(${activeCounts.gender})` : ""}`} k="gender">
-          <ul className="space-y-2">
-            {GENDERS.map((g) => {
-              const checked = getArrayParam(search, "gender").includes(g);
-              return (
-                <li key={g} className="flex items-center gap-2">
-                  <input
-                    id={`gender-${g}`}
-                    type="checkbox"
-                    className="h-4 w-4 accent-dark-900"
-                    checked={checked}
-                    onChange={() => onToggle("gender" as GroupKey, g)}
-                  />
-                  <label htmlFor={`gender-${g}`} className="text-body text-dark-900">
-                    {g[0].toUpperCase() + g.slice(1)}
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </Group>
+          <Group title={`Categoria ${activeCounts.category ? `(${activeCounts.category})` : ""}`} k="category">
+            <ul className="space-y-3">
+              {CATEGORIES.map((cat) => {
+                const checked = getArrayParam(search, "category").includes(cat);
+                return (
+                  <li key={cat}>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-dark-300 text-dark-900 focus:ring-dark-900 focus:ring-1"
+                        checked={checked}
+                        onChange={() => onToggle("category", cat)}
+                      />
+                      <span className="text-sm text-dark-700 group-hover:text-dark-900 transition-colors p-2">
+                        {formatCategory(cat)}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </Group>
 
-        <Group title={`Size ${activeCounts.size ? `(${activeCounts.size})` : ""}`} k="size">
-          <ul className="grid grid-cols-5 gap-2">
-            {SIZES.map((s) => {
-              const checked = getArrayParam(search, "size").includes(s);
-              return (
-                <li key={s}>
-                  <label className="inline-flex items-center gap-2">
+          <Group title={`Genero ${activeCounts.gender ? `(${activeCounts.gender})` : ""}`} k="gender">
+            <ul className="space-y-3">
+              {GENDERS.map((g) => {
+                const checked = getArrayParam(search, "gender").includes(g);
+                return (
+                  <li key={g}>
+                    <label className="flex items-center gap-3 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-dark-300 text-dark-900 focus:ring-dark-900 focus:ring-1"
+                        checked={checked}
+                        onChange={() => onToggle("gender", g)}
+                      />
+                      <span className="text-sm text-dark-700 group-hover:text-dark-900 transition-colors">
+                        {g[0].toUpperCase() + g.slice(1)}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </Group>
+
+          <Group title={`Talla ${activeCounts.size ? `(${activeCounts.size})` : ""}`} k="size">
+            <ul className="grid grid-cols-5 gap-2">
+              {SIZES.map((s) => {
+                const checked = getArrayParam(search, "size").includes(s);
+                return (
+                  <li key={s}>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-dark-900"
+                        checked={checked}
+                        onChange={() => onToggle("size", s)}
+                      />
+                      <span className="text-body font-roboto">{s}</span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </Group>
+
+          <Group title={`Color ${activeCounts.color ? `(${activeCounts.color})` : ""}`} k="color">
+            <ul className="grid grid-cols-2 gap-2">
+              {COLORS.map((c) => {
+                const checked = getArrayParam(search, "color").includes(c);
+                return (
+                  <li key={c} className="flex items-center gap-2">
                     <input
+                      id={`color-${c}`}
                       type="checkbox"
                       className="h-4 w-4 accent-dark-900"
                       checked={checked}
-                      onChange={() => onToggle("size", s)}
+                      onChange={() => onToggle("color", c)}
                     />
-                    <span className="text-body">{s}</span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </Group>
+                    <label htmlFor={`color-${c}`} className="text-body capitalize font-roboto">
+                      {c}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </Group>
 
-        <Group title={`Color ${activeCounts.color ? `(${activeCounts.color})` : ""}`} k="color">
-          <ul className="grid grid-cols-2 gap-2">
-            {COLORS.map((c) => {
-              const checked = getArrayParam(search, "color").includes(c);
-              return (
-                <li key={c} className="flex items-center gap-2">
-                  <input
-                    id={`color-${c}`}
-                    type="checkbox"
-                    className="h-4 w-4 accent-dark-900"
-                    checked={checked}
-                    onChange={() => onToggle("color", c)}
-                  />
-                  <label htmlFor={`color-${c}`} className="text-body capitalize">
-                    {c}
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </Group>
-
-        <Group title={`Price ${activeCounts.price ? `(${activeCounts.price})` : ""}`} k="price">
-          <ul className="space-y-2">
-            {PRICES.map((p) => {
-              const checked = getArrayParam(search, "price").includes(p.id);
-              return (
-                <li key={p.id} className="flex items-center gap-2">
-                  <input
-                    id={`price-${p.id}`}
-                    type="checkbox"
-                    className="h-4 w-4 accent-dark-900"
-                    checked={checked}
-                    onChange={() => onToggle("price", p.id)}
-                  />
-                  <label htmlFor={`price-${p.id}`} className="text-body">
-                    {p.label}
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-        </Group>
-      </aside>
-
-      {open && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
-          <div
-            className="absolute inset-0 bg-black/40"
-            aria-hidden="true"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-80 max-w-[80%] overflow-auto bg-light-100 p-4 shadow-xl">
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-body-medium">Filters</h3>
-              <button className="text-caption text-dark-700 underline" onClick={clearAll}>
-                Clear all
-              </button>
-            </div>
-            {/* Reuse the same desktop content by rendering the component again */}
-            <div className="md:hidden">
-              <Group title="Gender" k="gender">
-                <ul className="space-y-2">
-                  {GENDERS.map((g) => {
-                    const checked = getArrayParam(search, "gender").includes(g);
-                    return (
-                      <li key={g} className="flex items-center gap-2">
-                        <input
-                          id={`m-gender-${g}`}
-                          type="checkbox"
-                          className="h-4 w-4 accent-dark-900"
-                          checked={checked}
-                          onChange={() => onToggle("gender", g)}
-                        />
-                        <label htmlFor={`m-gender-${g}`} className="text-body">
-                          {g[0].toUpperCase() + g.slice(1)}
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Group>
-
-              <Group title="Size" k="size">
-                <ul className="grid grid-cols-4 gap-2">
-                  {SIZES.map((s) => {
-                    const checked = getArrayParam(search, "size").includes(s);
-                    return (
-                      <li key={s}>
-                        <label className="inline-flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 accent-dark-900"
-                            checked={checked}
-                            onChange={() => onToggle("size", s)}
-                          />
-                          <span className="text-body">{s}</span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Group>
-
-              <Group title="Color" k="color">
-                <ul className="grid grid-cols-2 gap-2">
-                  {COLORS.map((c) => {
-                    const checked = getArrayParam(search, "color").includes(c);
-                    return (
-                      <li key={c} className="flex items-center gap-2">
-                        <input
-                          id={`m-color-${c}`}
-                          type="checkbox"
-                          className="h-4 w-4 accent-dark-900"
-                          checked={checked}
-                          onChange={() => onToggle("color", c)}
-                        />
-                        <label htmlFor={`m-color-${c}`} className="text-body capitalize">
-                          {c}
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Group>
-
-              <Group title="Price" k="price">
-                <ul className="space-y-2">
-                  {PRICES.map((p) => {
-                    const checked = getArrayParam(search, "price").includes(p.id);
-                    return (
-                      <li key={p.id} className="flex items-center gap-2">
-                        <input
-                          id={`m-price-${p.id}`}
-                          type="checkbox"
-                          className="h-4 w-4 accent-dark-900"
-                          checked={checked}
-                          onChange={() => onToggle("price", p.id)}
-                        />
-                        <label htmlFor={`m-price-${p.id}`} className="text-body">
-                          {p.label}
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </Group>
-            </div>
-          </div>
+          <Group title={`Precio ${activeCounts.price ? `(${activeCounts.price})` : ""}`} k="price">
+            <ul className="space-y-2">
+              {PRICES.map((p) => {
+                const checked = getArrayParam(search, "price").includes(p.id);
+                return (
+                  <li key={p.id} className="flex items-center gap-2">
+                    <input
+                      id={`price-${p.id}`}
+                      type="checkbox"
+                      className="h-4 w-4 accent-dark-900"
+                      checked={checked}
+                      onChange={() => onToggle("price", p.id)}
+                    />
+                    <label htmlFor={`price-${p.id}`} className="text-body font-roboto">
+                      {p.label}
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          </Group>
         </div>
-      )}
-    </>
+        <div className="absolute bottom-0 left-0 right-0 p-6 bg-white border-t border-light-200">
+          <SheetTrigger asChild>
+            <button className="w-full bg-dark-900 text-white py-3 rounded-full font-medium hover:bg-dark-800 transition-colors">
+              Show Products
+            </button>
+            
+          </SheetTrigger>
+        </div>
+      </SheetContent>
+
+    </Sheet>
   );
 }

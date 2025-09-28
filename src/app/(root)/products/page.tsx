@@ -31,18 +31,23 @@ export default async function ProductsPage({
   });
 
   return (
-    <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <header className="flex items-center justify-between py-6">
-        <h1 className="text-heading-3 text-dark-900">New ({totalCount})</h1>
-        <Sort />
+    <main className="mx-auto max-w-auto ">
+      <header className="py-6 text-center">
+        <h2 className="text-base font-light text-dark-900 font-roboto-slab mb-4">
+          {totalCount} Nuevos productos
+        </h2>
+        <p className="text-sm text-dark-700 font-light font-roboto max-w-2xl mx-auto">
+          Cada pieza cuenta una historia de elegancia atemporal.
+        </p>
       </header>
 
+
       {activeBadges.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2 p-8">
           {activeBadges.map((b, i) => (
             <span
               key={`${b}-${i}`}
-              className="rounded-full border border-light-300 px-3 py-1 text-caption text-dark-900"
+              className="rounded-full border border-light-300 px-3 py-1 text-caption text-dark-900 font-roboto p-4"
             >
               {b}
             </span>
@@ -50,22 +55,28 @@ export default async function ProductsPage({
         </div>
       )}
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
-        <Filters />
-        <div>
+      <div className="sticky top-10 md:top-16 z-20 bg-white/98 backdrop-blur-md py-4 px-8">
+        <div className="flex items-center justify-between">
+          <Filters />
+          <Sort />
+        </div>
+      </div>
+
+      <section className="relative">
+        <div className="flex-1">
           {products.length === 0 ? (
             <div className="rounded-lg border border-light-300 p-8 text-center">
-              <p className="text-body text-dark-700">No products match your filters.</p>
+              <p className="text-body text-dark-700 font-roboto"> No se pudieron encontrar resultados.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 pb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 pb-6 border">
               {products.map((p) => {
                 const price =
                   p.minPrice !== null && p.maxPrice !== null && p.minPrice !== p.maxPrice
                     ? `$${p.minPrice} - $${p.maxPrice}`
                     : p.minPrice !== null
-                    ? p.minPrice
-                    : undefined;
+                      ? p.minPrice
+                      : undefined;
                 return (
                   <Card
                     key={p.id}

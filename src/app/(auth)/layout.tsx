@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ReactNode } from "react";
+import { ReactNode, Suspense } from "react";
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -8,8 +8,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <section className="hidden lg:flex flex-col justify-between bg-dark-900 text-light-100 p-6 xl:p-10">
         <div className="flex items-center">
           <div className="h-10 w-40 rounded-md bg-orange inline-flex items-center justify-center">
-            <Link  href="/">
-            <Image src="/logo.png" alt="AMMAE logo" width={200} height={90} className="object-contain" priority />
+            <Link href="/">
+              <Image src="/logo.png" alt="AMMAE logo" width={200} height={90} className="object-contain" priority />
             </Link>
           </div>
         </div>
@@ -30,7 +30,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       </section>
 
       <section className="flex items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md">{children}</div>
+        <div className="w-full max-w-md">
+          <Suspense fallback={<div className="h-96 animate-pulse bg-light-100 rounded-xl" />}>
+            {children}
+          </Suspense>
+        </div>
       </section>
     </main>
   );

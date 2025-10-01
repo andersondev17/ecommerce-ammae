@@ -68,30 +68,16 @@ export default function ProductGallery({
   const isVideo = (src: string) => /\.(mp4|webm|ogg)$/i.test(src);
 
   return (
-    <section className={`flex w-full flex-col gap-4 lg:flex-row ${className}`}>
-      <div className="order-2 flex gap-3 overflow-x-auto lg:order-1 lg:flex-col">
-        {images.map((src, i) => (
-          <button
-            key={`${src}-${i}`}
-            aria-label={`Thumbnail ${i + 1}`}
-            onClick={() => setActiveIndex(i)}
-            className={`relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-light-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500] ${i === activeIndex ? "ring-[--color-dark-500]" : ""}`}
-          >
-            {isVideo(src) ?
-              <video src={src} className="w-full h-full object-cover" muted /> :
-              <Image src={src} alt={`Thumbnail ${i + 1}`} fill sizes="64px" className="object-contain" />
-            }
-          </button>
-        ))}
-      </div>
-
-      <div ref={mainRef} className="order-1 relative w-full h-dvh overflow-hidden rounded-xl bg-light-200 lg:order-2">
-        {images.length > 0 ? (
-          <>
-            {isVideo(images[activeIndex]) ?
-              <video src={images[activeIndex]} className="w-full h-full object-contain" autoPlay muted loop playsInline /> :
+    <section className={`relative ${className}`}>
+      {images.length > 0 ? (
+        <>
+          {/* Mobile: Single image  */}
+          <div ref={mainRef} className="relative w-full h-full overflow-hidden bg-light-200 lg:hidden">
+            {isVideo(images[activeIndex]) ? (
+              <video src={images[activeIndex]} className="w-full h-full object-contain" autoPlay muted loop playsInline />
+            ) : (
               <Image src={images[activeIndex]} alt="Product image" fill sizes="(min-width:1024px) 720px, 100vw" className="object-contain" priority />
-            }
+            )}
 
             <div className="absolute inset-0 flex items-center justify-between px-2">
               <button
@@ -109,6 +95,30 @@ export default function ProductGallery({
                 <ChevronRight className="h-5 w-5 text-dark-900" />
               </button>
             </div>
+          </div>
+
+          {/* Desktop: Vertical scroll */}
+          <div className="hidden lg:flex flex-col">
+            {images.map((img, idx) => (
+              <div
+                key={idx}
+                className="relative w-full aspect-[4/3] overflow-hidden bg-light-200"
+              >
+                {isVideo(img) ? (
+                  <video src={img} className="w-full h-full object-contain" autoPlay muted loop playsInline />
+                ) : (
+                  <Image
+                    src={img}
+                    alt={`Product image ${idx + 1}`}
+                    fill
+                    sizes="(min-width:1024px) 720px, 100vw"
+                    className="object-cover object-top"
+                    priority={idx === 0}
+                  />
+                )}
+              </div>
+            ))}
+           </div>
           </>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-dark-700">
@@ -118,8 +128,6 @@ export default function ProductGallery({
             </div>
           </div>
         )}
-      </div>
-
     </section>
   );
 }

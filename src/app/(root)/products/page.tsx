@@ -20,7 +20,7 @@ export default async function ProductsPage({
   (sp.gender ? (Array.isArray(sp.gender) ? sp.gender : [sp.gender]) : []).forEach((g) =>
     activeBadges.push(String(g)[0].toUpperCase() + String(g).slice(1))
   );
-  (sp.size ? (Array.isArray(sp.size) ? sp.size : [sp.size]) : []).forEach((s) => activeBadges.push(`Size: ${s}`));
+  (sp.size ? (Array.isArray(sp.size) ? sp.size : [sp.size]) : []).forEach((s) => activeBadges.push(`Talla: ${s}`));
   (sp.color ? (Array.isArray(sp.color) ? sp.color : [sp.color]) : []).forEach((c) =>
     activeBadges.push(String(c)[0].toUpperCase() + String(c).slice(1))
   );

@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
-import { Check } from "lucide-react";
 import { useVariantStore } from "@/store/variant";
+import { Check } from "lucide-react";
+import Image from "next/image";
 
 type Variant = { color: string; images: string[] };
 

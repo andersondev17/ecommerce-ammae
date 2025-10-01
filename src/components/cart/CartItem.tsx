@@ -27,7 +27,7 @@ export function CartItem({ item, isLoading, onQuantityChange, onRemove }: CartIt
         <p className="text-gray-600 text-sm">
           {item.color && `Color: ${item.color}`}
           {item.color && item.size && " • "}
-          {item.size && `Size: ${item.size}`}
+          {item.size && `Talla: ${item.size}`}
         </p>
         <p className="font-semibold text-gray-900 mt-2">
           ${(item.salePrice ?? item.price)}

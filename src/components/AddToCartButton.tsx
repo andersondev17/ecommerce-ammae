@@ -8,11 +8,15 @@ import { toast } from "sonner";
 export function AddToCartButton({
     productId,
     productVariantId,
-    disabled = false
+    disabled = false,
+    compact = false
+
 }: {
     productId: string;
     productVariantId: string;
     disabled?: boolean;
+    compact?: boolean;
+
 }) {
     const [isAdding, setIsAdding] = useState(false);
     const { addItem } = useCartStore();
@@ -42,9 +46,9 @@ export function AddToCartButton({
         <button
             onClick={handleAddToCart}
             disabled={disabled || isAdding}
-            className="flex items-center justify-center gap-2 font-roboto-slab rounded-2xl bg-dark-900 border-2 border-dark-900 px-6 py-3 text-body-medium text-light-100 transition-colors hover:bg-light-100 hover:text-dark-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500] disabled:opacity-50"
+            className={`flex items-center ${compact ? "py-2 px-4 text-xs " : "px-4 py-3 text-xs md:text-sm "} tracking-wide justify-center gap-2 font-roboto-slab rounded-full bg-dark-900 border-2 border-dark-900  text-body-medium text-light-100 transition-colors hover:bg-light-100 hover:text-dark-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500] disabled:opacity-50`}
         >
-            {isAdding ? "Añadiendo..." : "Añadir a tu selección"}
+            {isAdding ? "Añadiendo..." : "Colocar en el carrito"}
         </button>
     );
 }

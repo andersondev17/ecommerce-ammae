@@ -5,12 +5,13 @@ import { useCartStore } from "@/store/cart.store";
 import { ShoppingBagIcon, UserIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const SUBCATEGORIES = {
   men: ["jeans", "camisetas", "hoodies"],
   women: ["jeans", "blusas", "vestidos", "hoodies"],
-  unisex: [ "hoodies"]
+  unisex: ["hoodies"]
 } as const;
 
 const NAV_LINKS = [
@@ -27,6 +28,11 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [itemCount, setItemCount] = useState(0);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const pathname = usePathname();
+  const isHeroPage = pathname === '/';
+  const isProductDetail = /^\/products\/[0-9a-f-]+$/i.test(pathname);
+
 
   // Access store methods and state
   const { items, initialize, isInitialized, getItemCount } = useCartStore();
@@ -45,23 +51,38 @@ export default function Navbar() {
     }
   }, [initialize, isInitialized]);
 
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 0);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const navClasses = {
+    bg: isProductDetail && !isScrolled ? 'bg-transparent' : (isScrolled || !isHeroPage) ? 'bg-white' : 'bg-transparent',
+    text: (isScrolled || !isHeroPage) ? 'text-muted-foreground' : 'text-white',
+    icon: (isScrolled || !isHeroPage) ? 'text-black' : 'text-white',
+    logo: isProductDetail && !isScrolled ? '' : (isScrolled || !isHeroPage) ? '' : 'invert',
+  };
+  const showNavItems = !isProductDetail;
+
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white shadow-sm transition-all duration-300" onMouseLeave={() => setActiveSubmenu(null)}>
+      <header className={`group/nav sticky top-0 z-50  transition-colors duration-300 ${navClasses.bg} hover:bg-white`}
+        onMouseLeave={() => setActiveSubmenu(null)}>
         <nav className="mx-auto flex h-12 sm:h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
 
-          <Link href="/" className="flex items-center">
+          <Link href="/" className={`flex items-center transition-all duration-300 ${isProductDetail && !isScrolled ? 'absolute left-1/2 -translate-x-1/5' : ''}`}>
             <Image
               src="/logo.png"
               alt="AMMAE"
               width={140}
               height={90}
               priority
-              className="w-[140px] h-auto sm:w-[190px]"
+              className={`w-[140px] h-auto sm:w-[190px] transition-all duration-300 ${navClasses.logo} group-hover/nav:invert-0`}
             />
           </Link>
 
-          <ul className="hidden md:flex items-center gap-8" >
+          <ul className={`hidden md:flex items-center gap-8 transition-opacity duration-300 ${showNavItems ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             {NAV_LINKS.map((link) => (
               <li
                 key={link.href}
@@ -70,43 +91,32 @@ export default function Navbar() {
               >
                 <Link
                   href={link.href}
-                  className="nav-link relative text-sm font-medium font-roboto text-muted-foreground hover:text-foreground transition-colors duration-200 overflow-hidden"
+                  className={`nav-link relative text-sm font-medium tracking-wide font-roboto transition-colors duration-200 ${navClasses.text} group-hover/nav:text-foreground`}
                 >
                   <span className="relative z-10">{link.label}</span>
-                  <span className="absolute inset-0 bg-muted transform scale-x-0 origin-left transition-transform duration-800 hover:scale-x-100" />
                 </Link>
-
-                {/* Bridge invisible para mantener hover */}
-                {link.hasSubmenu && (
-                  <div className="absolute top-full left-0 right-0 h-2 bg-transparent" />
-                )}
+                {link.hasSubmenu && <div className="absolute top-full left-0 right-0 h-2 bg-transparent" />}
               </li>
             ))}
           </ul>
 
           <div className="flex items-center gap-4">
             <Link href="/sign-in" className="flex md:hidden items-center group" aria-label="Sign in">
-              <UserIcon className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground group-hover:text-foreground group-hover:scale-105 transition-all duration-200" />
+              <UserIcon className={`h-4 w-4 sm:h-5 sm:w-5 transition-all duration-200 ${navClasses.icon} group-hover/nav:text-gray-700`} />
             </Link>
             <Link href="/cart" className="relative flex items-center gap-2 group" aria-label="View cart">
-              <ShoppingBagIcon className="h-4 w-4 sm:h-5 sm:w-5 text-gray-700 group-hover:text-gray-900 group-hover:scale-105 group-hover:drop-shadow-sm transition-all duration-200" />
+              <ShoppingBagIcon className={`h-4 w-4 sm:h-5 sm:w-5 transition-all duration-200 ${navClasses.icon} group-hover/nav:text-gray-700`} />
               {itemCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-[10px] sm:text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-medium min-w-[16px] sm:min-w-[20px] shadow-sm animate-pulse">
+                <span className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-[10px] sm:text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center font-medium shadow-sm animate-pulse">
                   {itemCount > 99 ? "99+" : itemCount}
                 </span>
               )}
             </Link>
 
-            <button
-              className={`md:hidden flex items-end menu-button w-8 h-8 sm:w-10 sm:h-10 ${open ? 'open' : ''}`}
-              onClick={() => setOpen(!open)}
-              aria-expanded={open}
-              aria-label="Toggle menu"
-            >
+            <button className={`md:hidden flex items-end menu-button bg-transparent w-8 h-8 sm:w-10 sm:h-10 ${open ? 'open' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Toggle menu">
               <div className="menu-burger" />
             </button>
           </div>
-
         </nav>
 
         {/* Mega menu */}
@@ -156,7 +166,7 @@ export default function Navbar() {
 
         {/* Mobile menu */}
         {open && (
-          <div className="md:hidden border-t border-border bg-background">
+          <div className="md:hidden border-t border-border bg-white">
             <div className="px-4 py-3 space-y-1">
               {NAV_LINKS.map((link) => (
                 <Link
@@ -168,13 +178,6 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-
-              <div className="flex justify-between pt-3 border-t border-border">
-                <button className="text-sm font-medium text-muted-foreground">Search</button>
-                <Link href="/cart" className="text-sm font-medium text-muted-foreground">
-                  Cart ({itemCount})
-                </Link>
-              </div>
             </div>
           </div>
         )}

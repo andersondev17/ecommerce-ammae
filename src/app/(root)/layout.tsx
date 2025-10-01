@@ -9,12 +9,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <header className="bg-light-200 justify-between items-center ">
         <div className="bg-light-200 hidden md:flex justify-between items-center max-w-7xl mx-auto py-1">
           <div className="flex items-center gap-4 ml-auto">
-            <Link href="/sign-up" className="text-sm font-medium font-roboto text-muted-foreground hover:text-foreground transition-colors">
-                            Registrarse
+            <Link href="/sign-up" className="text-sm font-medium font-roboto text-muted-foreground hover:text-foreground transition-colors tracking-wide">
+              Crear una cuenta
 
             </Link>
             <span className="text-border">|</span>
-            <Link href="/sign-in" className="text-sm font-medium font-roboto text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/sign-in" className="text-sm font-medium font-roboto text-muted-foreground hover:text-foreground transition-colors tracking-wide">
               Iniciar sesión
             </Link>
           </div>

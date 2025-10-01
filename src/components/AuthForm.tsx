@@ -134,7 +134,7 @@ export default function AuthForm({ mode, onSubmit }: Props) {
           type="submit"
           className="mt-2 w-full rounded-full bg-dark-900 px-6 py-3 text-body-medium text-light-100 hover:bg-dark-700 focus:outline-none focus:ring-2 focus:ring-dark-900/20 font-roboto-slab"
         >
-          {mode === "sign-in" ? "Sign In" : "Sign Up"}
+          {mode === "sign-in" ? "Iniciar Sesion" : "Crear Cuenta"}
         </button>
 
         {mode === "sign-up" && (

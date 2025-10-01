@@ -1,14 +1,19 @@
 import { Card } from "@/components";
+import Hero from "@/components/Hero";
 import { getAllProducts } from "@/lib/actions/product";
 
 const Home = async () => {
   const { products } = await getAllProducts({ limit: 3, sort: "newest" });
 
   return (
-    <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <section aria-labelledby="latest" className="pb-12">
-        
-        <div className="grid grid-cols-1 gap-6 p-14 sm:grid-cols-2 lg:grid-cols-3">
+    <main className="mx-auto max-w-auto">
+      <Hero />
+      <section aria-labelledby="latest" className="py-24 px-8">        
+        <div className="max-w-7xl mx-auto">
+          <h2 id="latest" className="text-3xl font-light tracking-tight text-dark-900 mb-16">
+            Lo Último
+          </h2>
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {products.map((p) => {
 
             return (
@@ -20,6 +25,7 @@ const Home = async () => {
               />
             );
           })}
+          </div>
         </div>
       </section>
     </main>

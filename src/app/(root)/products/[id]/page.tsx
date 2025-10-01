@@ -49,7 +49,7 @@ async function ReviewsSection({ productId }: { productId: string }) {
 
   return (
     <CollapsibleSection className="font-roboto text-sm"
-      title={`Reviews (${count})`}
+      title={`Comentarios (${count})`}
       rightMeta={
         <span className="flex items-center gap-1 text-dark-900">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -59,22 +59,22 @@ async function ReviewsSection({ productId }: { productId: string }) {
       }
     >
       {reviews.length === 0 ? (
-        <p className="text-sm font-roboto">No reviews yet.</p>
+        <p className="font-light font-roboto text-xs md:text-sm">Todavía no hay comentarios.</p>
       ) : (
         <ul className="space-y-4">
           {reviews.slice(0, 10).map((r) => (
             <li key={r.id} className="rounded-lg border border-light-300 p-4">
               <div className="mb-1 flex items-center justify-between">
-                <p className="text-body-medium text-dark-900 font-roboto">{r.author}</p>
+                <p className="text-sm text-dark-900 font-roboto">{r.author}</p>
                 <span className="flex items-center gap-1">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <Star key={i} className={`h-4 w-4 ${i <= r.rating ? "fill-[--color-dark-900]" : ""}`} />
                   ))}
                 </span>
               </div>
-              {r.title && <p className="text-body-medium text-dark-900">{r.title}</p>}
+              {r.title && <p className="text-sm text-dark-900">{r.title}</p>}
               {r.content && <p className="mt-1 line-clamp-[8] text-body text-dark-700">{r.content}</p>}
-              <p className="mt-2 text-caption text-dark-700">{new Date(r.createdAt).toLocaleDateString()}</p>
+              <p className="mt-2 text-sm text-dark-700">{new Date(r.createdAt).toLocaleDateString()}</p>
             </li>
           ))}
         </ul>
@@ -88,8 +88,8 @@ async function AlsoLikeSection({ productId }: { productId: string }) {
   if (!recs.length) return null;
   return (
     <section className="mt-16">
-      <h2 className="mb-6 text-heading-3 text-dark-900 font-roboto">You Might Also Like</h2>
-      <div className="grid grid-cols-2 gap-6 md:grid-cols-4 ">
+      <h2 className="text-xl font-light tracking-tight text-dark-900 mb-16 px-2">Tambien te puede gustar</h2>
+      <div className="grid grid-cols-2  md:grid-cols-4 ">
         {recs.map((p) => (
           <Card
             key={p.id}
@@ -104,7 +104,7 @@ async function AlsoLikeSection({ productId }: { productId: string }) {
   );
 }
 
-export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductDetailPage({ params }: { params: Promise<{ id: string, }> }) {
   const { id } = await params;
   const data = await getProduct(id);
 
@@ -154,26 +154,22 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     product.gender?.label ? `${product.category?.name}  de ${formatCategory(product.gender.label)} ` : undefined;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <nav className="py-4 text-xs tracking-wide text-dark-500">
-        <Link href="/" className="hover:underline font-roboto-slab">Home</Link> / <Link href="/products" className="hover:underline font-roboto-slab">Products</Link> /{" "}
-        <span className="text-dark-700 font-roboto-slab">{product.name}</span>
-      </nav>
+    <main className="mx-auto max-w-auto -mt-24 md:-mt-16">
 
-      <section className="grid grid-cols-1 gap-10 lg:grid-cols-[1fr_480px]">
+      <section className="grid grid-cols-1 gap-1 lg:grid-cols-[1fr_680px]">
         {galleryVariants.length > 0 && (
-          <div className="lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden">
-            <ProductGallery productId={product.id} variants={galleryVariants} className="w-full h-screen lg:h-9/12" />
+          <div>
+            <ProductGallery productId={product.id} variants={galleryVariants} className="w-full h-screen lg:h-auto" />
           </div>
         )}
 
-        <div className="flex flex-col gap-4 px-4 sm:px-6 lg:px-14 py-6 lg:py-4 max-w-md">
+        <aside className="flex flex-col gap-4 px-4 sm:px-6 lg:px-32 py-6 lg:py-4 max-w-auto mt-0 lg:mt-28 lg:sticky lg:top-0 lg:self-start">
           <header className="flex flex-col gap-0.5 mb-1">
-            <p className="text-[11px] uppercase  text-dark-900 font-light font-roboto-slab mb-4">
+            <p className="text-[10px] uppercase  text-dark-900 font-light font-roboto-slab mb-2">
               REF: {product.id.slice(-6).toUpperCase()}
             </p>
-            {subtitle && <p className="text-[11px] uppercase tracking-[0.2em] text-dark-700 font-light font-roboto">{subtitle}</p>}
-            <h1 className="text-3xl font-light tracking-wide  font-roboto-slab">{product.name}</h1>
+            {subtitle && <p className="text-[10px] uppercase tracking-[0.2em] text-dark-700 font-light font-roboto">{subtitle}</p>}
+            <h1 className="text-2xl font-light tracking-wide  font-roboto-slab">{product.name}</h1>
             <div className="flex items-center ">
               <p className="text-[13px] uppercase tracking-[0.1em] font-light text-dark-900 font-roboto-slab">{formatPrice(displayPrice)}</p>
               {compareAt && (
@@ -189,7 +185,6 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             </div>
           </header>
 
-
           <ProductActions
             productId={product.id}
             variants={variants}
@@ -198,14 +193,14 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           />
 
           <CollapsibleSection className="font-roboto text-sm" title="Detalles del producto" defaultOpen>
-            <div className="space-y-3">
+            <div className="space-y-3 font-light font-roboto text-xs">
               {product.description.includes('.') ? (
                 <div className="space-y-2">
                   {product.description
                     .split('.')
                     .filter(sentence => sentence.trim())
                     .map((sentence, index) => (
-                      <p key={index} className="text-sm font-roboto">
+                      <p key={index} className=" text-xs md:text-[13px] font-roboto">
                         • {sentence.trim()}.
                       </p>
                     ))
@@ -220,25 +215,25 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </CollapsibleSection>
 
           <CollapsibleSection className="font-roboto text-sm" title="Envios y devoluciones">
-            <p className="font-roboto text-sm"> Despues de realizar tu compra, el tiempo estimado de entrega es de aproximadamente 3 a 4 días hábiles.</p>
+            <p className="font-light font-roboto text-xs md:text-[13px] "> Despues de realizar tu compra, el tiempo estimado de entrega es de aproximadamente 3 a 4 días hábiles.</p>
           </CollapsibleSection>
 
           <Suspense
             fallback={
               <CollapsibleSection className="font-roboto text-sm" title="Comentarios">
-                <p className="text-sm text-dark-500 font-roboto">Cargando comentarios...</p>
+                <p className="font-light font-roboto text-xs md:text-sm">Cargando comentarios...</p>
               </CollapsibleSection>
             }
           >
             <ReviewsSection productId={product.id} />
           </Suspense>
-        </div>
+        </aside>
       </section>
 
       <Suspense
         fallback={
           <section className="mt-16">
-            <h2 className="mb-6 text-heading-3 text-dark-900 font-roboto">You Might Also Like</h2>
+            <h2 className="text-xl justify-center font-light tracking-tight text-dark-900 mb-16">Tambien te puede gustar</h2>
             <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="h-64 animate-pulse rounded-xl bg-light-200" />
@@ -247,7 +242,18 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           </section>
         }
       >
-        <AlsoLikeSection productId={product.id} />
+        <div className="relative py-16">
+          <ProductActions
+            productId={product.id}
+            productName={product.name}
+            price={displayPrice}
+            variants={variants}
+            galleryVariants={galleryVariants}
+            defaultVariantId={product.defaultVariantId}
+            isSticky
+          />
+          <AlsoLikeSection productId={product.id} />
+        </div> 
       </Suspense>
     </main>
   );

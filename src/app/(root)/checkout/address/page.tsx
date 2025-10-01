@@ -12,7 +12,7 @@ export default async function CheckoutAddressPage() {
     const user = await getCurrentUser();
 
     if (!user?.id) {
-        redirect("/auth?redirect=/checkout/address");
+        redirect("/sign-in?redirect=/checkout/address");
     }
 
     const addressResult = await getUserAddresses();

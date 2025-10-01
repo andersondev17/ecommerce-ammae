@@ -3,14 +3,14 @@ import Link from "next/link";
 export function EmptyCart() {
     return (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-            <h1 className="text-2xl font-bold text-gray-900 mb-8">Cart</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-8">Tu Seleccion</h1>
             <div className="text-center py-12">
-                <p className="text-gray-600 mb-4">Your cart is empty</p>
+                <p className="text-gray-600 mb-4">Tu carrito está vacío</p>
                 <Link
                     href="/products"
-                    className="bg-dark-900 text-light-100 px-6 py-2 rounded-full hover:bg-gray-800 transition-colors"
+                    className="bg-dark-900 text-light-100 px-6 py-2 rounded-full  hover:bg-light-100 hover:text-dark-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500] disabled:opacity-50 border border-dark-900"
                 >
-                    Continue Shopping
+                    Continuar Comprando
                 </Link>
             </div>
         </div>

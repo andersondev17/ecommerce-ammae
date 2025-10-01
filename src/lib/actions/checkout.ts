@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { addresses, cartItems, carts, guests, orderItems, orders, payments, productImages, productVariants, products } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { createMercadoPagoPreference } from "../payments/mercadopagoClient";
+import { formatCurrency } from "../utils";
 import { mergeCarts } from "./cart";
 
 export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
@@ -121,25 +122,24 @@ async function handleMercadoPagoCheckout({ items, total, userId }: {
 }) {
     try {
         // 1. Crear orden en BD ANTES de crear preferencia MP
-        const newOrder = await db.insert(orders).values({
+        const [newOrder] = await db.insert(orders).values({
             userId: userId ?? null,
             status: "pending",
             totalAmount: total.toFixed(2),
             createdAt: new Date(),
         }).returning();
 
-        const orderId = newOrder[0].id;
+        const orderId = newOrder.id;
 
         // 2. Insertar items de la orden
-        for (const item of items) {
-            await db.insert(orderItems).values({
+        await db.insert(orderItems).values(
+            items.map(item => ({
                 orderId,
                 productVariantId: item.productVariantId,
                 quantity: item.quantity,
                 priceAtPurchase: (item.salePrice ?? item.price).toString(),
-            });
-        }
-
+            }))
+        );
         // 3. Crear payment record inicial
         await db.insert(payments).values({
             orderId,
@@ -163,11 +163,7 @@ async function handleMercadoPagoCheckout({ items, total, userId }: {
         console.log('MP Checkout URL created:', checkoutUrl);
 
         // cliente manejará redirect
-        return {
-            success: true,
-            checkoutUrl,
-            orderId
-        };
+        return { success: true, checkoutUrl, orderId };
 
     } catch (error) {
         console.error('MercadoPago checkout error:', error);
@@ -185,25 +181,24 @@ async function handleWhatsAppCheckout({ items, total, userId }: {
 }) {
     try {
         // 1. Crear orden en BD
-        const newOrder = await db.insert(orders).values({
+        const [newOrder] = await db.insert(orders).values({
             userId: userId ?? null,
             status: "pending",
             totalAmount: total.toFixed(2),
             createdAt: new Date(),
         }).returning();
 
-        const orderId = newOrder[0].id;
+        const orderId = newOrder.id;
 
         // 2. Insertar items
-        for (const item of items) {
-            await db.insert(orderItems).values({
+        await db.insert(orderItems).values(
+            items.map(item => ({
                 orderId,
                 productVariantId: item.productVariantId,
                 quantity: item.quantity,
                 priceAtPurchase: (item.salePrice ?? item.price).toString(),
-            });
-        }
-
+            }))
+        );
         // 3. Crear payment record
         await db.insert(payments).values({
             orderId,
@@ -211,36 +206,35 @@ async function handleWhatsAppCheckout({ items, total, userId }: {
             status: "initiated",
             transactionId: `WA-${orderId}`,
         });
+        const shortOrderId = orderId.slice(-8).toUpperCase();
+        const shortUserId = userId?.slice(-8).toUpperCase();
 
         // 4. Generar WhatsApp URL y DEVOLVERLA
         const phone = process.env.WHATSAPP_NUMBER?.replace(/\D/g, "") ?? "";
         if (!phone) {
             throw new Error("WHATSAPP_NUMBER not configured");
         }
-
-        const totalFmt = new Intl.NumberFormat("es-CO", {
-            style: "currency",
-            currency: "COP",
-            maximumFractionDigits: 0
-        }).format(total);
-
-        const itemsTxt = items.map(item =>
-            `${item.quantity} x ${item.productName} - ${new Intl.NumberFormat("es-CO", {
+        const totalFmt = (amount: number) =>
+            new Intl.NumberFormat("es-CO", {
                 style: "currency",
                 currency: "COP",
-                maximumFractionDigits: 0
-            }).format((item.salePrice ?? item.price) * item.quantity)}`
-        ).join("\n");
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            }).format(amount);
+
+        const itemsTxt = items.map(item =>
+            `• ${item.quantity}x ${item.productName} - ${formatCurrency((item.salePrice ?? item.price) * item.quantity)}`
+        ).join('\n');
 
         const message = encodeURIComponent(
             ` *¡Tu pedido ya está listo para confirmar!*\n\n` +
-            ` *Orden #${orderId}*\n` +
+            ` *Orden #${shortOrderId}*\n` +
             `${itemsTxt}\n\n` +
-            ` *Subtotal:* ${totalFmt}\n\n` +
-            ` *Envío:* $200%0A` +
-            ` *Total:* ${totalFmt}\n\n` +
-            `🙌 Cliente: ${userId ?? "Invitado"}\n\n` +
-            `🚀 📦 Tu pedido será enviado cuando confirmemos el pago.`
+            // 4. CALL the totalFmt function to format the subtotal and total
+            ` *Envío:* $10.000\n` +
+            ` *Total:* ${totalFmt(total)}\n\n` +
+            ` Cliente: ${shortUserId ?? "Invitado"}\n\n` +
+            ` Tu pedido será enviado cuando confirmemos el pago.`
         );
 
         const whatsappUrl = `https://wa.me/${phone}?text=${message}`;
@@ -252,7 +246,8 @@ async function handleWhatsAppCheckout({ items, total, userId }: {
             success: true,
             checkoutUrl: whatsappUrl,
             orderId
-        };
+        }
+
 
     } catch (error) {
         console.error('WhatsApp checkout error:', error);

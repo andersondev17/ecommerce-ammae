@@ -5,6 +5,7 @@ import { formatCategory } from "@/lib/utils";
 import { Star } from "lucide-react";
 import { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 type GalleryVariant = { color: string; images: string[] };
@@ -109,14 +110,8 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   if (!data) {
     return (
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <nav className="py-4 text-caption text-dark-700">
-          <Link href="/" className="hover:underline font-roboto-slab">Home</Link> / <Link href="/products" className="hover:underline font-roboto-slab">Products</Link> /{" "}
-          <span className="text-dark-900 font-roboto">Not found</span>
-        </nav>
-        <NotFoundBlock />
-      </main>
-    );
+      notFound()
+    )
   }
 
   const { product, variants, images } = data;

@@ -1,6 +1,7 @@
 "use client";
 
 import { handleCheckout, validateCheckoutRequirements } from "@/lib/actions/checkout";
+import { formatCurrency } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -31,16 +32,6 @@ export function CartSummary({ items }: CartSummaryProps) {
     const total = subtotal + shipping;
     const router = useRouter();
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("es-CO", {
-            style: "currency",
-            currency: "COP",
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-        }).format(amount);
-    };
-
-
     const handlePay = (method: "mercadopago" | "whatsapp") => {
         startTransition(async () => {
             try {
@@ -55,7 +46,7 @@ export function CartSummary({ items }: CartSummaryProps) {
                 // 2. Handle authentication requirement
                 if (validation.requiresAuth) {
                     toast.error("Debes iniciar sesión para continuar");
-                    router.push("/auth?redirect=/cart");
+                    router.push("/sign-in?redirect=/cart");
                     return;
                 }
 
@@ -71,9 +62,9 @@ export function CartSummary({ items }: CartSummaryProps) {
                 const result = await handleCheckout(method);
                 console.log('Result:', result);
 
-                if (!result.success) {
+                if ('error' in result) {
                     console.error('Checkout failed:', result.error);
-                    toast.error(result.error || "Error al iniciar el pago");
+                    toast.error(result.error);
                     return;
                 }
 

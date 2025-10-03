@@ -8,6 +8,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 const cartCache = new Map();
+export async function invalidateCartCache(cartId: string) {
+    const cacheKey = `cart-items-${cartId}`;
+    cartCache.delete(cacheKey);
+}
 
 // Validation schemas
 const addCartItemSchema = z.object({
@@ -33,6 +37,7 @@ export type CartItem = {
     color?: string;
     size?: string;
     sku: string;
+    inStock: number;
 };
 
 export type CartData = {
@@ -145,6 +150,7 @@ export async function getCart(): Promise<{ success: boolean; data: CartData }> {
                 colorName: colors.name,
                 sizeName: sizes.name,
                 imageUrl: productImages.url,
+                inStock: sql<number>`${productVariants.inStock}`,
             })
             .from(cartItems)
             .innerJoin(productVariants, eq(cartItems.productVariantId, productVariants.id))
@@ -173,6 +179,7 @@ export async function getCart(): Promise<{ success: boolean; data: CartData }> {
             color: item.colorName || undefined,
             size: item.sizeName || undefined,
             sku: item.sku,
+            inStock: item.inStock
         }));
 
         const subtotal = cartItemsData.reduce((sum, item) => {

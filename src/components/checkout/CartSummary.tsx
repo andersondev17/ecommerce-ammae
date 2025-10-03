@@ -2,6 +2,7 @@
 
 import { handleCheckout, validateCheckoutRequirements } from "@/lib/actions/checkout";
 import { formatPrice } from "@/lib/utils";
+import { useCartStore } from "@/store/cart.store";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -33,58 +34,62 @@ export function CartSummary({ items }: CartSummaryProps) {
     const total = subtotal + shipping;
     const router = useRouter();
 
-    const handlePay = (method: "mercadopago" | "whatsapp") => {
-        startTransition(async () => {
-            try {
-                // 1. Validate checkout requirements first
-                const validation = await validateCheckoutRequirements();
+   const handlePay = (method: "mercadopago" | "whatsapp") => {
+    startTransition(async () => {
+        try {
+            const validation = await validateCheckoutRequirements();
 
-                if (!validation.success) {
-                    toast.error("Error al validar checkout");
-                    return;
-                }
-
-                // 2. Handle authentication requirement
-                if (validation.requiresAuth) {
-                    toast.error("Debes iniciar sesión para continuar");
-                    router.push("/sign-in?redirect=/cart");
-                    return;
-                }
-
-                // 3. Handle missing address requirement
-                if (validation.requiresAddress) {
-                    toast.error("Necesitas agregar una dirección de envío");
-                    router.push("/checkout/address");
-                    return;
-                }
-
-                // 4. Proceed with checkout if all validations pass
-                console.log('Calling handleCheckout...');
-                const result = await handleCheckout(method);
-                console.log('Result:', result);
-
-                if ('error' in result) {
-                    console.error('Checkout failed:', result.error);
-                    toast.error(result.error);
-                    return;
-                }
-
-                // 5. Handle successful checkout response
-                if ('checkoutUrl' in result && result.checkoutUrl) {
-                    console.log('Redirecting to:', result.checkoutUrl);
-                    window.location.href = result.checkoutUrl;
-                    return;
-                }
-
-                console.error('No checkoutUrl found in result');
-                toast.error("No se pudo generar la URL de pago");
-
-            } catch (error) {
-                console.error("Checkout exception:", error);
-                toast.error("Error al iniciar el pago. Intenta nuevamente.");
+            if (!validation.success) {
+                toast.error("Error al validar checkout");
+                return;
             }
-        });
-    };
+
+            if (validation.requiresAuth) {
+                toast.error("Debes iniciar sesión para continuar");
+                router.push("/sign-in?redirect=/cart");
+                return;
+            }
+
+            if (validation.requiresAddress) {
+                toast.error("Necesitas agregar una dirección de envío");
+                router.push("/checkout/address");
+                return;
+            }
+
+            console.log('Calling handleCheckout...');
+            const result = await handleCheckout(method);
+            console.log('Result:', result);
+
+            if ('error' in result) {
+                console.error('Checkout failed:', result.error);
+                toast.error(result.error);
+                return;
+            }
+
+            if ('checkoutUrl' in result && result.checkoutUrl) {
+                console.log('Redirecting to:', result.checkoutUrl);
+                
+                // CAMBIO: Limpiar ANTES del redirect con timeout
+                const { clearAfterCheckout } = useCartStore.getState();
+                clearAfterCheckout();
+                
+                // Forzar flush del localStorage antes del redirect
+                setTimeout(() => {
+                    window.location.href = result.checkoutUrl;
+                }, 150);
+                
+                return;
+            }
+
+            console.error('No checkoutUrl found in result');
+            toast.error("No se pudo generar la URL de pago");
+
+        } catch (error) {
+            console.error("Checkout exception:", error);
+            toast.error("Error al iniciar el pago. Intenta nuevamente.");
+        }
+    });
+};
 
 
     return (

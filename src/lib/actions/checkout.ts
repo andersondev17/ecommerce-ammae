@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { addresses, cartItems, carts, guests, orderItems, orders, payments, productImages, productVariants, products } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { createMercadoPagoPreference } from "../payments/mercadopagoClient";
-import { formatCurrency } from "../utils";
+import { formatPrice } from "../utils";
 import { mergeCarts } from "./cart";
 
 export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
@@ -81,7 +81,7 @@ export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
             return sum + (price * item.quantity);
         }, 0);
 
-        const total = subtotal + 200; // Shipping in COP
+        const total = subtotal + 10000; // Shipping in COP
 
         console.log(`Total: $${total} COP`);
 
@@ -96,6 +96,7 @@ export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
                 items,
                 total,
                 userId: user?.id,
+                cartId: cart.id,
             });
         }
 
@@ -174,10 +175,11 @@ async function handleMercadoPagoCheckout({ items, total, userId }: {
     }
 }
 
-async function handleWhatsAppCheckout({ items, total, userId }: {
+async function handleWhatsAppCheckout({ items, total, userId , cartId }: {
     items: CheckoutItem[];
     total: number;
     userId?: string;
+    cartId: string
 }) {
     try {
         // 1. Crear orden en BD
@@ -206,6 +208,10 @@ async function handleWhatsAppCheckout({ items, total, userId }: {
             status: "initiated",
             transactionId: `WA-${orderId}`,
         });
+        await db.delete(cartItems).where(eq(cartItems.cartId, cartId));
+         const { invalidateCartCache } = await import('./cart');
+        invalidateCartCache(cartId);
+        
         const shortOrderId = orderId.slice(-8).toUpperCase();
         const shortUserId = userId?.slice(-8).toUpperCase();
 
@@ -223,7 +229,7 @@ async function handleWhatsAppCheckout({ items, total, userId }: {
             }).format(amount);
 
         const itemsTxt = items.map(item =>
-            `• ${item.quantity}x ${item.productName} - ${formatCurrency((item.salePrice ?? item.price) * item.quantity)}`
+            `• ${item.quantity}x ${item.productName} - ${formatPrice((item.salePrice ?? item.price) * item.quantity)}`
         ).join('\n');
 
         const message = encodeURIComponent(
@@ -240,12 +246,16 @@ async function handleWhatsAppCheckout({ items, total, userId }: {
         const whatsappUrl = `https://wa.me/${phone}?text=${message}`;
 
         console.log('WhatsApp URL created:', whatsappUrl);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const successUrl = `${baseUrl}/checkout/success?order_id=${orderId}&method=whatsapp&wa_url=${encodeURIComponent(whatsappUrl)}`;
+
 
         //  cliente manejará redirect
         return {
             success: true,
-            checkoutUrl: whatsappUrl,
-            orderId
+            checkoutUrl: successUrl,
+            orderId,
+            whatsappUrl
         }
 
 

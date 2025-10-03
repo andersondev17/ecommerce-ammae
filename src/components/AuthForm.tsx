@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import SocialProviders from "./SocialProviders";
+import { Button } from "./ui/Button";
 
 type Props = {
   mode: "sign-in" | "sign-up";
@@ -26,7 +27,7 @@ export default function AuthForm({ mode, onSubmit }: Props) {
     try {
       const result = await onSubmit(formData);
 
-      if(result?.ok) {
+      if (result?.ok) {
         // If user successfully logged in and we have a userId, merge guest cart
         if (result.userId) {
           await mergeGuestCart(result.userId);
@@ -130,12 +131,11 @@ export default function AuthForm({ mode, onSubmit }: Props) {
           </div>
         </div>
 
-        <button
-          type="submit"
-          className="mt-2 w-full rounded-full bg-dark-900 px-6 py-3 text-body-medium text-light-100 hover:bg-dark-700 focus:outline-none focus:ring-2 focus:ring-dark-900/20 font-roboto-slab"
+        <Button
+          type="submit" fullWidth
         >
           {mode === "sign-in" ? "Iniciar Sesion" : "Crear Cuenta"}
-        </button>
+        </Button>
 
         {mode === "sign-up" && (
           <p className="text-center text-footnote text-dark-700 font-roboto">

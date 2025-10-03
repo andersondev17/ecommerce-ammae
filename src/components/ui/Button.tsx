@@ -12,6 +12,8 @@ type ButtonProps = {
     fullWidth?: boolean;
     type?: "button" | "submit" | "reset";
     ariaLabel?: string;
+    target?: "_blank" | "_self"; // ← NUEVO
+    rel?: string; // ← NUEVO
 };
 
 export function Button({
@@ -25,6 +27,8 @@ export function Button({
     fullWidth = false,
     type = "button",
     ariaLabel,
+    target, // ← NUEVO
+    rel, // ← NUEVO
 }: ButtonProps) {
     const baseStyles =
         "flex items-center justify-center tracking-wide font-roboto-slab rounded-full border-2 text-body-medium transition-colors focus:outline-none focus-visible:ring-2 disabled:opacity-50 disabled:cursor-not-allowed";
@@ -49,6 +53,19 @@ export function Button({
     );
 
     if (href) {
+        if (target === "_blank") {
+            return (
+                <a
+                    href={href}
+                    target={target}
+                    rel={rel || "noopener noreferrer"}
+                    className={className}
+                    aria-label={ariaLabel}
+                >
+                    {children}
+                </a>
+            );
+        }
         return (
             <Link href={href} className={className} aria-label={ariaLabel}>
                 {children}

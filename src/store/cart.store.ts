@@ -9,6 +9,8 @@ interface CartStore {
   items: CartItem[];
   isLoading: boolean;
   isInitialized: boolean;
+  lastAddedItem: CartItem | null;
+  clearAfterCheckout: () => void;
 
   // Computed properties as functions
   getItemCount: () => number;
@@ -32,6 +34,7 @@ export const useCartStore = create<CartStore>()(
       items: [],
       isLoading: false,
       isInitialized: false,
+      lastAddedItem: null,
 
       // Computed values as functions
       getItemCount: () => {
@@ -62,10 +65,10 @@ export const useCartStore = create<CartStore>()(
         try {
           const result = await cartActions.getCart();
           if (result.success) {
-            set({ 
-              items: result.data.items, 
+            set({
+              items: result.data.items,
               isInitialized: true,
-              isLoading: false 
+              isLoading: false
             });
           }
         } catch (error) {
@@ -84,39 +87,45 @@ export const useCartStore = create<CartStore>()(
 
           if (existingItem) {
             set({
-              items: currentItems.map(item => 
-                item.productVariantId === variantId 
+              items: currentItems.map(item =>
+                item.productVariantId === variantId
                   ? { ...item, quantity: item.quantity + qty }
                   : item
               )
             });
           } else {
             // Temporary item until server responds
-            set({ items: [...currentItems, { 
-              id: `temp-${Date.now()}`,
-              cartItemId: `temp-${Date.now()}`,
-              productVariantId: variantId,
-              productId: '',
-              name: 'Loading...',
-              price: 0,
-              quantity: qty,
-              image: '/placeholder.jpg',
-              sku: ''
-            }] });
+            set({
+              items: [...currentItems, {
+                id: `temp-${Date.now()}`,
+                cartItemId: `temp-${Date.now()}`,
+                productVariantId: variantId,
+                productId: '',
+                name: 'Loading...',
+                price: 0,
+                quantity: qty,
+                image: '/placeholder.jpg',
+                sku: '',
+                inStock: 0
+              }]
+            });
           }
 
           const result = await cartActions.addCartItem({ productVariantId: variantId, quantity: qty });
 
           if (result.success) {
             await get().syncWithServer();
-            toast.success('Item added to cart');
+            const addedItem = get().items.find(item => item.productVariantId === variantId);
+            if (addedItem) {
+              set({ lastAddedItem: addedItem });
+            }
           } else {
-            toast.error(result.error || 'Failed to add item to cart');
+            toast.error('No se pudo agregar al carrito');
             await get().syncWithServer(); // Revert on error
           }
         } catch (error) {
           console.error('Add item failed:', error);
-          toast.error('Failed to add item to cart');
+          toast.error('No se pudo agregar al carrito');
           await get().syncWithServer(); // Revert on error
         } finally {
           set({ isLoading: false });
@@ -130,7 +139,7 @@ export const useCartStore = create<CartStore>()(
         try {
           // Optimistic update
           set({
-            items: get().items.map(item => 
+            items: get().items.map(item =>
               item.productVariantId === variantId ? { ...item, quantity: qty } : item
             )
           });
@@ -138,14 +147,14 @@ export const useCartStore = create<CartStore>()(
           const result = await cartActions.updateCartItem({ productVariantId: variantId, quantity: qty });
 
           if (result.success) {
-            toast.success('Quantity updated');
+            toast.success('Cantidad Actualizada');
           } else {
-            toast.error(result.error || 'Failed to update quantity');
+            toast.error(result.error || 'No se pudo actualizar la cantidad');
             await get().syncWithServer(); // Revert on error
           }
         } catch (error) {
-          console.error('Update quantity failed:', error);
-          toast.error('Failed to update quantity');
+          console.error('No se pudo actualizar la cantidad:', error);
+          toast.error('No se pudo actualizar la cantidad');
           await get().syncWithServer(); // Revert on error
         } finally {
           set({ isLoading: false });
@@ -161,14 +170,14 @@ export const useCartStore = create<CartStore>()(
           const result = await cartActions.removeCartItem(variantId);
 
           if (result.success) {
-            toast.success('Item removed from cart');
+            toast.success('Producto eliminado');
           } else {
-            toast.error(result.error || 'Failed to remove item');
+            toast.error(result.error || 'No se pudo eliminar el producto');
             await get().syncWithServer(); // Revert on error
           }
         } catch (error) {
           console.error('Remove item failed:', error);
-          toast.error('Failed to remove item');
+          toast.error('No se pudo eliminar el producto');
           await get().syncWithServer(); // Revert on error
         } finally {
           set({ isLoading: false });
@@ -186,12 +195,12 @@ export const useCartStore = create<CartStore>()(
           if (result.success) {
             toast.success('Cart cleared');
           } else {
-            toast.error(result.error || 'Failed to clear cart');
+            toast.error(result.error || 'Error al limpiar el carrito');
             await get().syncWithServer(); // Revert on error
           }
         } catch (error) {
           console.error('Clear cart failed:', error);
-          toast.error('Failed to clear cart');
+          toast.error('No se pudo limpiar el carrito');
           await get().syncWithServer(); // Revert on error
         } finally {
           set({ isLoading: false });
@@ -223,9 +232,9 @@ export const useCartStore = create<CartStore>()(
             if (result.success) {
               // Sync with server to get the updated cart
               await get().syncWithServer();
-              toast.success('Cart merged successfully');
+              toast.success('carrito fusionado');
             } else {
-              toast.error(result.error || 'Failed to merge cart');
+              toast.error(result.error || 'Error al fusionar carrito');
             }
           } else {
             // No guest session, just sync with server
@@ -233,10 +242,15 @@ export const useCartStore = create<CartStore>()(
           }
         } catch (error) {
           console.error('Merge cart failed:', error);
-          toast.error('Failed to merge cart');
+          toast.error('No se pudo Fusionar el carrito');
         } finally {
           set({ isLoading: false });
         }
+
+      },
+      clearAfterCheckout: () => {
+        set({ items: [], isInitialized: false, lastAddedItem: null });
+        localStorage.removeItem('cart-storage');
       }
     }),
     {

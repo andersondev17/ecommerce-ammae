@@ -2,9 +2,12 @@
 
 import { CartData } from "@/lib/actions/cart";
 import { useCartStore } from "@/store/cart.store";
+import Link from "next/link";
 import { useEffect } from "react";
 import { CartSummary } from "./checkout/CartSummary";
+import { CheckoutInfo } from "./checkout/CheckoutInfo";
 import { CartItem, CartSkeleton, EmptyCart } from "./index";
+import { TrustBanner } from "./TrustBanner";
 
 interface CartContentProps {
     initialCart: {
@@ -47,8 +50,8 @@ export default function CartContent({ initialCart }: CartContentProps) {
     // Convert items to cents for proper calculation (assuming backend stores in cents)
     const itemsInCents = items.map(item => ({
         ...item,
-        price: item.price , // Convert to cents
-        salePrice: item.salePrice ? item.salePrice  : undefined
+        price: item.price, // Convert to cents
+        salePrice: item.salePrice ? item.salePrice : undefined
     }));
 
     const subtotal = itemsInCents.reduce((sum, item) => {
@@ -56,28 +59,44 @@ export default function CartContent({ initialCart }: CartContentProps) {
         return sum + (price * item.quantity);
     }, 0);
 
-    const total = subtotal + 200; // Add shipping in cents
+    const total = subtotal + 10000;
 
     return (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-            <h1 className="text-2xl font-bold text-gray-900 mb-8">Tu selección ({itemCount})</h1>
+        <div className="mx-auto max-w-full pl-4 sm:pl-6 lg:pl-8 bg-light-200">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_500px] lg:grid-rows-[auto_1fr]">
+                <div className="max-w-4x px-7 md:px-24">
+                    {/* LEFT TOP */}
+                    <div className="lg:row-start-1 lg:row-end-2 py-2 md:py-8">
+                        <TrustBanner />
+                    </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-6">
-                    {items.map((item) => (
-                        <CartItem
-                            key={item.cartItemId}
-                            item={item}
-                            isLoading={isLoading}
-                            onQuantityChange={handleQuantityChange}
-                            onRemove={removeItem}
-                        />
-                    ))}
+                    {/* LEFT BOTTOM */}
+                    <div className="lg:row-start-2 lg:row-end-3 space-y-6 lg:border-light-300">
+                        <div className="flex justify-between items-center m-2">
+                            <h1 className="text-xl  md:text-2xl font-medium tracking-wide mb-6 font-roboto">
+                                Mi selección <span className="text-muted-foreground text-base font-roboto font-light">({itemCount})</span>
+                            </h1>
+                            <Link href="/products" className="text-[12px] md:text-sm underline hover:text-gray-800 transition-colors">
+                                Continuar comprando
+                            </Link>
+                        </div>
+
+                        {items.map((item) => (
+                            <CartItem
+                                key={item.cartItemId}
+                                item={item}
+                                isLoading={isLoading}
+                                onQuantityChange={handleQuantityChange}
+                                onRemove={removeItem}
+                            />
+                        ))}
+                    </div>
                 </div>
-                <CartSummary
-                    items={itemsInCents}
-                    amount={total}
-                />
+                {/* RIGHT */}
+                <aside className="lg:col-start-2 lg:row-span-2 lg:sticky lg:top-6 lg:self-start space-y-6 bg-white border  p-8">
+                    <CartSummary items={itemsInCents} amount={total} />
+                    <CheckoutInfo />
+                </aside>
             </div>
         </div>
     );

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 interface PageProps {
     searchParams: Promise<{
-        // Parámetros oficiales de MP según documentación
+       // Parámetros oficiales de MP según documentación
         payment_id?: string;
         status?: string;
         external_reference?: string;
@@ -18,9 +18,9 @@ interface PageProps {
         collection_id?: string;
         collection_status?: string;
         preference_id?: string;
-        // WhatsApp params
         order_id?: string;
         method?: string;
+        wa_url?: string;
     }>;
 }
 
@@ -29,9 +29,31 @@ export default async function CheckoutSuccessPage({ searchParams }: PageProps) {
     
     console.log('Success page received params:', params);
 
+    if (params.order_id && params.method === 'whatsapp') {
+        const orderResult = await getOrder(params.order_id);
+        
+        if (orderResult?.order) {
+            return (
+                <OrderSuccess
+                    orderId={orderResult.order.id}
+                    items={orderResult.items.map(item => ({
+                        name: `Producto ${item.productVariantId}`,
+                        quantity: item.quantity,
+                        price: Number(item.priceAtPurchase),
+                        image: undefined
+                    }))}
+                    total={Number(orderResult.order.totalAmount)}
+                    paymentMethod="whatsapp"
+                    status="pending"
+                    whatsappUrl={params.wa_url}
+                />
+            );
+        }
+    }
+
     // Manejar success de Mercado Pago usando external_reference
     if (params.external_reference && (params.status === 'approved' || params.collection_status === 'approved')) {
-        const orderId = params.external_reference; // Este es nuestro orderId de la orden creada
+        const orderId = params.external_reference;
         
         console.log('Processing MP success for order:', orderId);
         
@@ -42,7 +64,7 @@ export default async function CheckoutSuccessPage({ searchParams }: PageProps) {
                 <OrderSuccess
                     orderId={orderResult.order.id}
                     items={orderResult.items.map(item => ({
-                        name: `Producto ${item.productVariantId}`, // Simplificado por ahora
+                        name: `Producto ${item.productVariantId}`,
                         quantity: item.quantity,
                         price: Number(item.priceAtPurchase),
                         image: undefined
@@ -81,29 +103,6 @@ export default async function CheckoutSuccessPage({ searchParams }: PageProps) {
         }
     }
 
-    // Manejar WhatsApp orders
-    if (params.order_id && params.method === 'whatsapp') {
-        const orderResult = await getOrder(params.order_id);
-        
-        if (orderResult?.order) {
-            return (
-                <OrderSuccess
-                    orderId={orderResult.order.id}
-                    items={orderResult.items.map(item => ({
-                        name: `Producto ${item.productVariantId}`,
-                        quantity: item.quantity,
-                        price: Number(item.priceAtPurchase),
-                        image: undefined
-                    }))}
-                    total={Number(orderResult.order.totalAmount)}
-                    paymentMethod="whatsapp"
-                    status="pending"
-                />
-            );
-        }
-    }
-
-    // Si no hay parámetros válidos, redirect al cart
     console.log('No valid parameters found, redirecting to cart');
     redirect("/cart?error=invalid_payment");
 }

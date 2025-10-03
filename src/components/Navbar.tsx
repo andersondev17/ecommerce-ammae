@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 const SUBCATEGORIES = {
   men: ["jeans", "camisetas", "hoodies"],
   women: ["jeans", "blusas", "vestidos", "hoodies"],
-  unisex: ["hoodies"]
+  unisex: [ "hoodies"]
 } as const;
 
 const NAV_LINKS = [
@@ -113,8 +113,8 @@ export default function Navbar() {
               )}
             </Link>
 
-            <button className={`md:hidden flex items-end menu-button bg-transparent w-8 h-8 sm:w-10 sm:h-10 ${open ? 'open' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Toggle menu">
-              <div className="menu-burger" />
+            <button className={`md:hidden flex items-end menu-button bg-transparent w-8 h-8 sm:w-10 sm:h-10 ${open ? 'open' : ''} ${navClasses.icon} group-hover/nav:text-gray-700`} onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Toggle menu">
+              <div className={`menu-burger`} />
             </button>
           </div>
         </nav>

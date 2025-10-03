@@ -1,10 +1,11 @@
 "use client";
 
 import { handleCheckout, validateCheckoutRequirements } from "@/lib/actions/checkout";
-import { formatCurrency } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
+import { Button } from "../ui/Button";
 
 interface CartItem {
     productVariantId: string;
@@ -28,7 +29,7 @@ export function CartSummary({ items }: CartSummaryProps) {
         return sum + (price * item.quantity);
     }, 0);
 
-    const shipping = 200;
+    const shipping = 10000;
     const total = subtotal + shipping;
     const router = useRouter();
 
@@ -88,43 +89,38 @@ export function CartSummary({ items }: CartSummaryProps) {
 
     return (
         <div className="rounded-lg bg-light-100 p-6">
-            <h2 className="text-heading-3 text-dark-900 mb-6">Resumen</h2>
-
             <div className="space-y-4 mb-6">
                 <div className="flex justify-between items-center">
-                    <span className="text-body text-dark-700">Subtotal</span>
-                    <span className="text-body text-dark-900">{formatCurrency(subtotal)}</span>
+                    <span className="text-heading-4 text-dark-900 font-roboto font-light">Subtotal</span>
+                    <span className="text-base text-dark-900 font-light font-roboto">{formatPrice(subtotal)}</span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                    <span className="text-body text-dark-700">Envío</span>
-                    <span className="text-body text-dark-900">{formatCurrency(shipping)}</span>
+                    <span className="text-heading-4 text-dark-900 font-roboto font-light">Envío</span>
+                    <span className="text-lg text-dark-900 font-light font-roboto">{formatPrice(shipping)}</span>
                 </div>
             </div>
 
             <div className="border-t border-light-300 pt-4 mb-6">
                 <div className="flex justify-between items-center">
-                    <span className="text-lead text-dark-900 font-medium">Total</span>
-                    <span className="text-lead text-dark-900 font-medium">{formatCurrency(total)}</span>
+                    <span className="text-heading-4 text-dark-900 font-medium font-roboto">Total</span>
+                    <span className="text-lg text-dark-900 font-medium font-roboto">{formatPrice(total)}</span>
                 </div>
             </div>
 
             <div className="space-y-3">
-                <button
-                    onClick={() => handlePay("mercadopago")}
-                    disabled={isPending || items.length === 0}
-                    className="w-full rounded-full bg-dark-900 px-6 py-4 text-body-medium text-light-100 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {isPending ? "Redirigiendo a Mercado Pago..." : "Pagar con Mercado Pago"}
-                </button>
+                <Button onClick={() => handlePay("mercadopago")} isLoading={isPending} fullWidth>
+                    Pagar con Mercado Pago
+                </Button>
 
-                <button
+                <Button
                     onClick={() => handlePay("whatsapp")}
-                    disabled={isPending || items.length === 0}
-                    className="w-full rounded-full border border-dark-900 px-6 py-4 text-body-medium text-dark-900 transition hover:bg-dark-900 hover:text-light-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-dark-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    variant="secondary"
+                    isLoading={isPending}
+                    fullWidth
                 >
-                    {isPending ? "Abriendo WhatsApp..." : "Enviar por WhatsApp"}
-                </button>
+                    Enviar por WhatsApp
+                </Button>
             </div>
         </div>
     );

@@ -83,16 +83,16 @@ export default function Filters() {
     <Sheet>
       <div className="flex items-center justify-between">
         <SheetTrigger asChild>
-          <button className="flex items-center gap-2  px-4 py-2 text-sm font-roboto transition-colors hover:text-light-50">
-            <IoFilter size={16} />
+          <button className="flex items-center gap-2  px-0   md:px-4 py-2 text-[12px] md:text-sm font-roboto transition-colors hover:text-light-50">
             Filtros 
+            <IoFilter size={16} />
           </button>
         </SheetTrigger>
       </div>
 
       <SheetContent side="left" className="w-[400px] sm:w-[400px] bg-white p-0">
         <SheetHeader className="px-6 py-4 border-b border-light-200 flex flex-row items-center justify-between">
-          <SheetTitle className="text-lg font-medium">Filtros</SheetTitle>
+          <SheetTitle className="text-base font-medium">Filtros</SheetTitle>
           {Object.values(activeCounts).some(count => count > 0) && (
             <button
               onClick={clearAll}

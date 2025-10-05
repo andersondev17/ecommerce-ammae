@@ -42,9 +42,11 @@
   --text-heading-2--line-height: 60px;
   --text-heading-2--font-weight: 700;
 
-  --text-heading-3: 24px;
-  --text-heading-3--line-height: 30px;
+  --text-heading-3: 18px;
+  --text-heading-3--line-height: 10px;
   --text-heading-3--font-weight: 500;
+  --text-heading-4: 15px;
+
 
   /* Lead */
   --text-lead: 20px;
@@ -110,7 +112,7 @@
   position: relative;
   width: 18px;
   height: 2px;
-  background: #111111;
+  background: currentColor;
   transition: all 0.3s ease;
 }
 
@@ -121,7 +123,7 @@
   left: 0;
   width: 18px;
   height: 2px;
-  background: #111111;
+  background: currentColor;
   transition: all 0.3s ease;
 }
 

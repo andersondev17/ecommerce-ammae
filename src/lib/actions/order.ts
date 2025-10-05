@@ -205,3 +205,24 @@ export async function getDefaultAddress(type: "shipping" | "billing") {
 
     return defaultAddress ?? null;
 }
+export async function getUserOrders() {
+    const user = await getCurrentUser();
+    if (!user?.id) return { success: false, error: "Not authenticated" };
+
+    try {
+        const userOrders = await db
+            .select({
+                id: orders.id,
+                status: orders.status,
+                totalAmount: orders.totalAmount,
+                createdAt: orders.createdAt,
+            })
+            .from(orders)
+            .where(eq(orders.userId, user.id))
+            .orderBy(orders.createdAt);
+
+        return { success: true, orders: userOrders };
+    } catch {
+        return { success: false, error: "Failed to fetch orders" };
+    }
+}

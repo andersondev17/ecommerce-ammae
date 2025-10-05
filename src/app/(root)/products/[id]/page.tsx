@@ -4,7 +4,6 @@ import { getProduct, getProductReviews, getRecommendedProducts, type Recommended
 import { formatCategory } from "@/lib/utils";
 import { Star } from "lucide-react";
 import { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
@@ -22,23 +21,6 @@ function formatPrice(price: number | null | undefined) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(price);
-}
-
-function NotFoundBlock() {
-  return (
-    <section className="mx-auto max-w-3xl rounded-xl border border-light-300 bg-light-100 p-8 text-center">
-      <h1 className="text-heading-3 text-dark-900 font-roboto">Product not found</h1>
-      <p className="mt-2 text-body text-dark-700 font-roboto">The product you’re looking for doesn’t exist or may have been removed.</p>
-      <div className="mt-6">
-        <Link
-          href="/products"
-          className="inline-block rounded-full font-roboto bg-dark-900 px-6 py-3 text-body-medium text-light-100 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-[--color-dark-500]"
-        >
-          Buscar Productos
-        </Link>
-      </div>
-    </section>
-  );
 }
 
 async function ReviewsSection({ productId }: { productId: string }) {
@@ -154,7 +136,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     product.gender?.label ? `${product.category?.name}  de ${formatCategory(product.gender.label)} ` : undefined;
 
   return (
-    <main className="mx-auto max-w-auto -mt-24 md:-mt-16">
+    <main className="mx-auto max-w-auto -mt-36 md:-mt-16">
 
       <section className="grid grid-cols-1 gap-1 lg:grid-cols-[1fr_680px]">
         {galleryVariants.length > 0 && (

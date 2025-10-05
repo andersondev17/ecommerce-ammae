@@ -1,9 +1,11 @@
-
-
+import { Button } from "@/components/ui/Button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { AddressData } from "@/lib/actions/order";
+import { AddressFormValues, addressSchema } from "@/lib/validations/address";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, Edit3, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { SubmitHandler, useForm } from "react-hook-form";
 
 interface Address {
     id: string;
@@ -53,26 +55,26 @@ export function AddressCard({
 
     return (
         <div
-            className={`border rounded-lg p-4 cursor-pointer transition ${isSelected
-                    ? "border-dark-900 bg-dark-50 ring-2 ring-dark-900"
-                    : "border-light-300 hover:border-dark-500"
+            className={`border rounded-xl p-6 cursor-pointer transition-all duration-300 ${isSelected
+                ? "border-dark-900 bg-light-50"
+                : "border-light-300 hover:border-dark-900"
                 }`}
             onClick={onSelect}
         >
             <div className="flex justify-between items-start">
                 <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-3">
                         {isSelected && <Check className="h-4 w-4 text-dark-900" />}
-                        <span className="text-body-medium text-dark-900">
+                        <span className="text-xs md:text-[13px] font-light text-dark-900 font-roboto">
                             {address.line1}
                         </span>
                         {address.isDefault && (
-                            <span className="text-small text-dark-500 bg-light-200 px-2 py-1 rounded">
+                            <span className="text-[10px] uppercase tracking-[0.15em] text-dark-700 bg-light-200 px-2 py-1 rounded font-roboto font-light">
                                 Por defecto
                             </span>
                         )}
                     </div>
-                    <p className="text-body text-dark-700">
+                    <p className="text-xs md:text-[13px] text-dark-700 font-roboto font-light">
                         {address.line2 && `${address.line2}, `}
                         {address.city}, {address.state} {address.postalCode}
                         <br />
@@ -86,7 +88,8 @@ export function AddressCard({
                             onEdit();
                         }}
                         disabled={disabled}
-                        className="text-dark-500 hover:text-dark-900 disabled:opacity-50"
+                        className="text-dark-500 hover:text-dark-900 disabled:opacity-50 transition"
+                        aria-label="Editar dirección"
                     >
                         <Edit3 className="h-4 w-4" />
                     </button>
@@ -96,7 +99,8 @@ export function AddressCard({
                             onDelete();
                         }}
                         disabled={disabled}
-                        className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                        className="text-red hover:text-red/80 disabled:opacity-50 transition"
+                        aria-label="Eliminar dirección"
                     >
                         <Trash2 className="h-4 w-4" />
                     </button>
@@ -109,142 +113,169 @@ export function AddressCard({
 // Formulario para crear/editar direcciones
 interface AddressFormProps {
     initialData?: Partial<Address>;
-    onSave: (data: AddressData | Partial<AddressData>) => void; 
+    onSave: (data: AddressData | Partial<AddressData>) => void;
     onCancel: () => void;
     disabled: boolean;
 }
+const LABEL_CLASS = "text-[10px] uppercase tracking-[0.2em] text-dark-900 font-roboto font-light";
 
 export function AddressForm({ initialData, onSave, onCancel, disabled }: AddressFormProps) {
-    const [formData, setFormData] = useState({
-        line1: initialData?.line1 || "",
-        line2: initialData?.line2 || "",
-        city: initialData?.city || "",
-        state: initialData?.state || "",
-        country: initialData?.country || "Colombia",
-        postalCode: initialData?.postalCode || "",
-        type: "shipping" as const,
-        isDefault: initialData?.isDefault || false,
+    const form = useForm<AddressFormValues>({
+        resolver: zodResolver(addressSchema),
+        mode: "onChange",
+        shouldFocusError: true,
+        defaultValues: {
+            line1: initialData?.line1 ?? "",
+            line2: initialData?.line2 ?? "",
+            city: initialData?.city ?? "",
+            state: initialData?.state ?? "",
+            postalCode: initialData?.postalCode ?? "",
+            country: initialData?.country ?? "Colombia",
+            isDefault: initialData?.isDefault ?? false,
+        }
     });
 
-    const handleSubmit = () => {
-        if (!formData.line1 || !formData.city || !formData.state || !formData.postalCode) {
-            toast.error("Completa todos los campos obligatorios");
-            return;
-        }
-        onSave(formData);
+    const handleSubmit: SubmitHandler<AddressFormValues> = (values) => {
+        const dataToSave: Partial<AddressData> = {
+            ...values,
+            line2: values.line2,
+            type: "shipping"
+        };
+        onSave(dataToSave);
     };
 
     return (
-        <div className="border border-light-300 rounded-lg p-6 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                    <label className="block text-body-medium text-dark-900 mb-2">
-                        Dirección *
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.line1}
-                        onChange={(e) => setFormData(prev => ({ ...prev, line1: e.target.value }))}
-                        className="w-full px-3 py-2 border border-light-300 rounded-md focus:outline-none focus:ring-2 focus:ring-dark-500"
-                        placeholder="Calle 123 #45-67"
+        <Form {...form}>
+            <form
+                onSubmit={form.handleSubmit(handleSubmit)}
+                className="border border-dark-900/10 rounded-xl p-8 space-y-6 bg-white"
+            >
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                     <FormField
+                        control={form.control}
+                        name="line1"
+                        render={({ field }) => (
+                            <FormItem className="sm:col-span-2">
+                                <FormLabel className={LABEL_CLASS}>Dirección *</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        {...field}
+                                        autoFocus
+                                        autoComplete="address-line1"
+                                        placeholder="Calle 123 #45-67"
+                                        disabled={disabled}
+                                    />
+                                </FormControl>
+                                <FormMessage className="text-xs font-roboto" />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="line2"
+                        render={({ field }) => (
+                            <FormItem className="sm:col-span-2">
+                                <FormLabel className={LABEL_CLASS}>Apartamento, suite, etc.</FormLabel>
+                                <FormControl>
+                                    <Input
+                                        {...field}
+                                        autoComplete="address-line2"
+                                        placeholder="Apto 101"
+                                        disabled={disabled}
+                                    />
+                                </FormControl>
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="city"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className={LABEL_CLASS}>Ciudad *</FormLabel>
+                                <FormControl>
+                                    <Input {...field} placeholder="Medellín" disabled={disabled} />
+                                </FormControl>
+                                <FormMessage className="text-xs font-roboto" />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="state"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className={LABEL_CLASS}>Departamento *</FormLabel>
+                                <FormControl>
+                                    <Input {...field} placeholder="Antioquia" disabled={disabled} />
+                                </FormControl>
+                                <FormMessage className="text-xs font-roboto" />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="postalCode"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className={LABEL_CLASS}>Código Postal *</FormLabel>
+                                <FormControl>
+                                    <Input {...field} placeholder="050001" disabled={disabled} />
+                                </FormControl>
+                                <FormMessage className="text-xs font-roboto" />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="country"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className={LABEL_CLASS}>País</FormLabel>
+                                <FormControl>
+                                    <select {...field} disabled={disabled} className="w-full px-4 py-3 border border-light-300 rounded-lg text-xs md:text-[13px] font-roboto font-light focus:outline-none focus:border-dark-900 transition disabled:opacity-50">
+                                        <option value="Colombia">Colombia</option>
+                                    </select>
+                                </FormControl>
+                            </FormItem>
+                        )}
                     />
                 </div>
 
-                <div className="sm:col-span-2">
-                    <label className="block text-body-medium text-dark-900 mb-2">
-                        Apartamento, suite, etc. (opcional)
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.line2}
-                        onChange={(e) => setFormData(prev => ({ ...prev, line2: e.target.value }))}
-                        className="w-full px-3 py-2 border border-light-300 rounded-md focus:outline-none focus:ring-2 focus:ring-dark-500"
-                        placeholder="Apto 101"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-body-medium text-dark-900 mb-2">
-                        Ciudad *
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.city}
-                        onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                        className="w-full px-3 py-2 border border-light-300 rounded-md focus:outline-none focus:ring-2 focus:ring-dark-500"
-                        placeholder="Medellín"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-body-medium text-dark-900 mb-2">
-                        Departamento/Estado *
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.state}
-                        onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-                        className="w-full px-3 py-2 border border-light-300 rounded-md focus:outline-none focus:ring-2 focus:ring-dark-500"
-                        placeholder="Antioquia"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-body-medium text-dark-900 mb-2">
-                        Código Postal *
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.postalCode}
-                        onChange={(e) => setFormData(prev => ({ ...prev, postalCode: e.target.value }))}
-                        className="w-full px-3 py-2 border border-light-300 rounded-md focus:outline-none focus:ring-2 focus:ring-dark-500"
-                        placeholder="050001"
-                    />
-                </div>
-
-                <div>
-                    <label className="block text-body-medium text-dark-900 mb-2">
-                        País
-                    </label>
-                    <select
-                        value={formData.country}
-                        onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                        className="w-full px-3 py-2 border border-light-300 rounded-md focus:outline-none focus:ring-2 focus:ring-dark-500"
-                    >
-                        <option value="Colombia">Colombia</option>
-                    </select>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-                <input
-                    type="checkbox"
-                    id="isDefault"
-                    checked={formData.isDefault}
-                    onChange={(e) => setFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
-                    className="h-4 w-4 text-dark-900 focus:ring-dark-500 border-light-300 rounded"
+                <FormField
+                    control={form.control}
+                    name="isDefault"
+                    render={({ field }) => (
+                        <FormItem className="flex items-center gap-3 space-y-0">
+                            <FormControl>
+                                <input
+                                    type="checkbox"
+                                    checked={field.value}
+                                    onChange={field.onChange}
+                                    disabled={disabled}
+                                    className="h-4 w-4 rounded border-light-300 disabled:opacity-50"
+                                />
+                            </FormControl>
+                            <FormLabel className="text-xs md:text-[13px] text-dark-700 font-roboto font-light !m-0">
+                                Establecer como dirección predeterminada
+                            </FormLabel>
+                        </FormItem>
+                    )}
                 />
-                <label htmlFor="isDefault" className="text-body text-dark-700">
-                    Establecer como dirección predeterminada
-                </label>
-            </div>
 
-            <div className="flex gap-3 pt-4">
-                <button
-                    onClick={handleSubmit}
-                    disabled={disabled}
-                    className="flex-1 rounded-full bg-dark-900 px-6 py-3 text-body-medium text-light-100 transition hover:opacity-90 disabled:opacity-50"
-                >
-                    {initialData ? "Actualizar" : "Guardar"} Dirección
-                </button>
-                <button
-                    onClick={onCancel}
-                    disabled={disabled}
-                    className="flex-1 rounded-full border border-dark-300 px-6 py-3 text-body-medium text-dark-900 transition hover:bg-light-50 disabled:opacity-50"
-                >
-                    Cancelar
-                </button>
-            </div>
-        </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <Button type="submit" disabled={disabled} variant="primary" fullWidth>
+                        {initialData ? "Actualizar" : "Guardar"} Dirección
+                    </Button>
+                    <Button type="button" onClick={onCancel} disabled={disabled} variant="secondary" fullWidth>
+                        Cancelar
+                    </Button>
+                </div>
+            </form>
+        </Form>
     );
 }

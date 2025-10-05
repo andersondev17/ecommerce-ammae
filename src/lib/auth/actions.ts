@@ -155,7 +155,8 @@ export async function getCurrentUser() {
 }
 
 export async function signOut() {
-  await auth.api.signOut({ headers: {} });
+  const headersList = await headers();
+  await auth.api.signOut({ headers: headersList });
   return { ok: true };
 }
 

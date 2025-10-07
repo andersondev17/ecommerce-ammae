@@ -12,6 +12,11 @@ interface WebhookPayload {
     data: { id: string };
     type: string;
 }
+interface MercadopagoPaymentResponse {
+    body?: MPPayment;
+    id?: string;
+    status?: string;
+}
 
 interface MPPayment {
     id: string;
@@ -77,7 +82,7 @@ async function fetchPaymentDetails(paymentId: string): Promise<MPPayment | null>
         const response = await new Payment(mercadopago).get({ id: paymentId });
 
         // El SDK puede retornar en .body o directamente
-        const payment = (response as any).body || response;
+        const payment = (response as MercadopagoPaymentResponse).body || response;
 
         if (!payment.id || !payment.status) {
             console.error('[MP Webhook] Invalid payment structure:', payment);

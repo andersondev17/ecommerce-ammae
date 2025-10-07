@@ -112,7 +112,7 @@ export async function createMercadoPagoPreference(params: PreferenceParams): Pro
         // y luego buscando la propiedad 'message' en el objeto de error (común en APIs)
         const errorMessage = error instanceof Error
             ? error.message
-            : (error as any)?.message ?? 'Error desconocido en la comunicación con MP';
+            : (error as { message?: string })?.message ?? 'Error desconocido en la comunicación con MP'; 
 
         console.error('❌ Error creando preferencia MP:', {
             cartId,

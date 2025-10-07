@@ -36,10 +36,7 @@ function validateMPSignature(params: {
         const ts = parts.find(p => p.startsWith('ts='))?.split('=')[1];
         const hash = parts.find(p => p.startsWith('v1='))?.split('=')[1];
 
-        if (!ts || !hash) {
-            console.error('Invalid x-signature format');
-            return false;
-        }
+        if (!ts || !hash) return false;
 
         // Build manifest according to MP official docs
         const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
@@ -50,10 +47,8 @@ function validateMPSignature(params: {
             .digest('hex');
 
         // Timing-safe comparison
-        return timingSafeEqual(
-            Buffer.from(hash),
-            Buffer.from(expectedHash)
-        );
+        return timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
+
     } catch (error) {
         console.error('Signature validation error:', error);
         return false;
@@ -66,7 +61,6 @@ export async function POST(req: NextRequest) {
         const xSignature = req.headers.get('x-signature');
         const xRequestId = req.headers.get('x-request-id');
         const dataId = new URL(req.url).searchParams.get('data.id');
-
         const secret = process.env.MP_WEBHOOK_SECRET;
 
         if (!secret) {
@@ -92,7 +86,6 @@ export async function POST(req: NextRequest) {
         });
 
         if (!isValid) {
-            console.error('❌ Invalid webhook signature - possible attack attempt');
             return new Response('Unauthorized', { status: 401 });
         }
 
@@ -100,8 +93,6 @@ export async function POST(req: NextRequest) {
 
         //  Parse body
         const body = await req.json();
-        console.log('MP Webhook received:', JSON.stringify(body, null, 2));
-
         const paymentId = body?.data?.id;
         if (!paymentId) {
             console.error('No payment ID in webhook body');
@@ -112,14 +103,14 @@ export async function POST(req: NextRequest) {
         const paymentResponse = await new Payment(mercadopago).get({ id: paymentId });
         const payment = (paymentResponse as MercadoPagoPaymentResponse).body ?? paymentResponse;
 
-        console.log('Payment details:', {
-            id: payment.id,
-            status: payment.status,
-            external_reference: payment.external_reference,
-            metadata: payment.metadata
-        });
+        /*         console.log('Payment details:', {
+                    id: payment.id,
+                    status: payment.status,
+                    external_reference: payment.external_reference,
+                    metadata: payment.metadata
+                }); */
 
-        //  Idempotency check (prevent duplicate processing)
+        //  Idempotency check 
         const existing = await db
             .select()
             .from(payments)
@@ -127,7 +118,7 @@ export async function POST(req: NextRequest) {
             .limit(1);
 
         if (existing.length && existing[0].status === "completed") {
-            console.log('⏭️  Payment already processed (idempotent)');
+            console.log('⏭️  Payment already processed');
             return new Response(null, { status: 200 });
         }
 
@@ -138,10 +129,25 @@ export async function POST(req: NextRequest) {
             return new Response('Invalid payment data', { status: 400 });
         }
 
-        console.log('Processing order:', externalOrderId);
+        const statusMap: Record<string, string> = {
+            'approved': 'paid',
+            'authorized': 'paid',
+            'pending': 'pending',
+            'in_process': 'pending',
+            'rejected': 'failed',
+            'cancelled': 'failed',
+            'refunded': 'refunded',
+            'charged_back': 'chargeback'
+        };
+        if (!payment.status) {
+            console.error('Payment missing status field');
+            return new Response('Invalid payment', { status: 400 });
+        }
+        const mappedStatus = statusMap[payment.status] || 'failed';
+
 
         // Process payment based on status
-        if (payment.status === "approved" || payment.status === "paid") {
+        if (mappedStatus === 'paid') {
             await createOrder({
                 orderId: String(externalOrderId),
                 paymentMethod: "mercadopago",
@@ -149,8 +155,8 @@ export async function POST(req: NextRequest) {
                 transactionId: String(payment.id),
                 paidAt: new Date(),
             });
-            console.log(`✅ Order ${externalOrderId} marked as PAID`);
-        } else if (payment.status === "pending") {
+            console.log(`✅ Order ${externalOrderId} PAID`);
+        } else if (mappedStatus === 'pending') {
             await db
                 .update(payments)
                 .set({ status: "initiated" })

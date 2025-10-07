@@ -3,24 +3,34 @@ import { db } from "@/lib/db";
 import { payments } from "@/lib/db/schema/payments";
 import { mercadopago } from "@/lib/payments/mercadopagoClient";
 import { createHmac, timingSafeEqual } from "crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { Payment } from "mercadopago";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-interface MercadoPagoPaymentResponse {
-    body?: MercadoPagoPayment;
-    id?: string;
-    status?: string;
-    external_reference?: string;
-    metadata?: Record<string, string | number | boolean>;
+interface WebhookPayload {
+    action: string;
+    data: { id: string };
+    type: string;
 }
 
-interface MercadoPagoPayment {
+interface MPPayment {
     id: string;
     status: string;
     external_reference?: string;
-    metadata?: Record<string, string | number | boolean>;
+    metadata?: Record<string, unknown>;
 }
+
+const STATUS_MAP: Record<string, string> = {
+    'approved': 'paid',
+    'authorized': 'paid',
+    'pending': 'pending',
+    'in_process': 'pending',
+    'in_mediation': 'pending',
+    'rejected': 'failed',
+    'cancelled': 'failed',
+    'refunded': 'failed',
+    'charged_back': 'failed'
+};
 
 function validateMPSignature(params: {
     dataId: string;
@@ -36,147 +46,186 @@ function validateMPSignature(params: {
         const ts = parts.find(p => p.startsWith('ts='))?.split('=')[1];
         const hash = parts.find(p => p.startsWith('v1='))?.split('=')[1];
 
-        if (!ts || !hash) return false;
+        if (!ts || !hash) {
+            console.warn('[MP Webhook] Missing signature components');
+            return false;
+        }
 
         // Build manifest according to MP official docs
         const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
-
         // Compute HMAC-SHA256
-        const expectedHash = createHmac('sha256', secret)
-            .update(manifest)
-            .digest('hex');
+        const expectedHash = createHmac('sha256', secret).update(manifest).digest('hex');
 
+        const signatureBuffer = Buffer.from(hash, 'hex');
+        const expectedBuffer = Buffer.from(expectedHash, 'hex');
+
+        if (signatureBuffer.length !== expectedBuffer.length) {
+            console.error('[MP Webhook] Signature length mismatch');
+            return false;
+        }
         // Timing-safe comparison
-        return timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash));
+        return timingSafeEqual(signatureBuffer, expectedBuffer);
 
     } catch (error) {
-        console.error('Signature validation error:', error);
+        console.error('[MP Webhook] Signature validation error:', error);
         return false;
     }
 }
 
-export async function POST(req: NextRequest) {
+async function fetchPaymentDetails(paymentId: string): Promise<MPPayment | null> {
     try {
-        // Extract and validate webhook authentication
-        const xSignature = req.headers.get('x-signature');
-        const xRequestId = req.headers.get('x-request-id');
-        const dataId = new URL(req.url).searchParams.get('data.id');
-        const secret = process.env.MP_WEBHOOK_SECRET;
+        const response = await new Payment(mercadopago).get({ id: paymentId });
 
-        if (!secret) {
-            console.error('MP_WEBHOOK_SECRET not configured');
-            return new Response('Server misconfiguration', { status: 500 });
+        // El SDK puede retornar en .body o directamente
+        const payment = (response as any).body || response;
+
+        if (!payment.id || !payment.status) {
+            console.error('[MP Webhook] Invalid payment structure:', payment);
+            return null;
         }
 
-        if (!xSignature || !xRequestId || !dataId) {
-            console.error('Missing required webhook parameters:', {
-                hasSignature: !!xSignature,
-                hasRequestId: !!xRequestId,
-                hasDataId: !!dataId
-            });
-            return new Response('Bad Request', { status: 400 });
-        }
+        return payment as MPPayment;
 
-        // Validate x signature
-        const isValid = validateMPSignature({
-            dataId,
-            xRequestId,
-            xSignature,
-            secret
-        });
+    } catch (error) {
+        console.error('[MP Webhook] Error fetching payment:', error);
+        return null;
+    }
+}
 
-        if (!isValid) {
-            return new Response('Unauthorized', { status: 401 });
-        }
+export async function POST(req: NextRequest) {
+    const startTime = Date.now();
+    const xSignature = req.headers.get('x-signature');
+    const xRequestId = req.headers.get('x-request-id');
+    const url = new URL(req.url);
+    const type = url.searchParams.get('type');
+    const dataId = url.searchParams.get('data.id');
 
-        console.log('✅ Webhook signature validated');
+    // Skip non-payment notifications
+    if (type !== 'payment') {
+        console.log(`[MP Webhook] Skipping ${type} notification`);
+        return new Response('received', { status: 200 });
+    }
 
+    const secret = process.env.MP_WEBHOOK_SECRET;
+    if (!secret) {
+        console.error('[MP Webhook] MP_WEBHOOK_SECRET not configured');
+        return new Response('Server misconfiguration', { status: 200 });
+    }
+
+    if (!xSignature || !xRequestId || !dataId) {
+        console.error('[MP Webhook] Missing required headers/params');
+        return new Response('Bad Request', { status: 200 });
+    }
+
+    // Validate x signature
+    const isValid = validateMPSignature({
+        dataId,
+        xRequestId,
+        xSignature,
+        secret
+    });
+    if (!isValid) {
+        console.error(`[MP Webhook] Invalid signature for payment: ${dataId}`);
+        return new Response('Unauthorized', { status: 401 });
+    }
+
+    console.log(`[MP Webhook] ✅ Signature validated for payment: ${dataId}`);
+
+    try {
         //  Parse body
-        const body = await req.json();
+        const body = await req.json() as WebhookPayload;
         const paymentId = body?.data?.id;
-        if (!paymentId) {
-            console.error('No payment ID in webhook body');
-            return new Response('Invalid payload', { status: 400 });
+        if (!paymentId || paymentId !== dataId) {
+            console.error('[MP Webhook] Payment ID mismatch');
+            return new Response('Invalid payload', { status: 200 });
         }
 
-        // Fetch payment details from Mercado Pago API
-        const paymentResponse = await new Payment(mercadopago).get({ id: paymentId });
-        const payment = (paymentResponse as MercadoPagoPaymentResponse).body ?? paymentResponse;
-
-        /*         console.log('Payment details:', {
-                    id: payment.id,
-                    status: payment.status,
-                    external_reference: payment.external_reference,
-                    metadata: payment.metadata
-                }); */
-
-        //  Idempotency check 
-        const existing = await db
-            .select()
+        // Check if already processed
+        const existingPayment = await db
+            .select({ status: payments.status })
             .from(payments)
-            .where(eq(payments.transactionId, String(payment.id)))
+            .where(
+                and(
+                    eq(payments.transactionId, paymentId),
+                    or(
+                        eq(payments.status, "completed"),
+                        eq(payments.status, "failed")
+                    )
+                )
+            )
             .limit(1);
 
-        if (existing.length && existing[0].status === "completed") {
-            console.log('⏭️  Payment already processed');
-            return new Response(null, { status: 200 });
+        if (existingPayment.length) {
+            console.log(`[MP Webhook] Payment ${paymentId} already processed (${existingPayment[0].status})`);
+            return NextResponse.json(
+                { received: true, already_processed: true },
+                { status: 200 }
+            );
         }
 
-        //  Extract orderId from external_reference or metadata
-        const externalOrderId = payment.external_reference ?? payment.metadata?.cartId;
-        if (!externalOrderId) {
-            console.error('No order reference found in payment');
-            return new Response('Invalid payment data', { status: 400 });
+        // Fetch payment details
+        const paymentDetails = await fetchPaymentDetails(paymentId);
+        if (!paymentDetails) {
+            return NextResponse.json(
+                { received: false, error: 'Payment not found' },
+                { status: 200 }
+            );
         }
 
-        const statusMap: Record<string, string> = {
-            'approved': 'paid',
-            'authorized': 'paid',
-            'pending': 'pending',
-            'in_process': 'pending',
-            'rejected': 'failed',
-            'cancelled': 'failed',
-            'refunded': 'refunded',
-            'charged_back': 'chargeback'
-        };
-        if (!payment.status) {
-            console.error('Payment missing status field');
-            return new Response('Invalid payment', { status: 400 });
+        const orderId = paymentDetails.external_reference ?? paymentDetails.metadata?.cartId;
+        if (!orderId || typeof orderId !== 'string') {
+            console.error('[MP Webhook] Missing order reference in payment');
+            return NextResponse.json(
+                { received: false, error: 'Missing order reference' },
+                { status: 200 }
+            );
         }
-        const mappedStatus = statusMap[payment.status] || 'failed';
 
+        const mappedStatus = STATUS_MAP[paymentDetails.status] || 'failed';
 
-        // Process payment based on status
+        // Process payment
         if (mappedStatus === 'paid') {
             await createOrder({
-                orderId: String(externalOrderId),
+                orderId,
                 paymentMethod: "mercadopago",
                 status: "paid",
-                transactionId: String(payment.id),
+                transactionId: paymentDetails.id,
                 paidAt: new Date(),
             });
-            console.log(`✅ Order ${externalOrderId} PAID`);
+            console.log(`[MP Webhook] ✅ Order ${orderId} PAID (${Date.now() - startTime}ms)`);
+
         } else if (mappedStatus === 'pending') {
             await db
                 .update(payments)
                 .set({ status: "initiated" })
-                .where(eq(payments.orderId, String(externalOrderId)));
-            console.log(`⏳ Order ${externalOrderId} marked as PENDING`);
+                .where(eq(payments.orderId, orderId));
+            console.log(`[MP Webhook] ⏳ Order ${orderId} PENDING (${Date.now() - startTime}ms)`);
+
         } else {
             await db
                 .update(payments)
                 .set({ status: "failed" })
-                .where(eq(payments.orderId, String(externalOrderId)));
-            console.log(`❌ Order ${externalOrderId} marked as FAILED (status: ${payment.status})`);
+                .where(eq(payments.orderId, orderId));
+            console.log(`[MP Webhook] ❌ Order ${orderId} FAILED: ${paymentDetails.status} (${Date.now() - startTime}ms)`);
         }
 
         // Return 200 OK (MP requirement to stop retries)
-        return new Response(null, { status: 200 });
+        return NextResponse.json(
+            {
+                received: true,
+                payment_id: paymentId,
+                status: mappedStatus,
+                processing_time_ms: Date.now() - startTime
+            },
+            { status: 200 }
+        );
 
-    } catch (err) {
-        console.error("❌ MP webhook processing error:", err);
-        // Return 200 to prevent MP retries on our internal errors
-        // (they will retry indefinitely on 5xx responses)
-        return new Response(null, { status: 200 });
+    } catch (error) {
+        console.error('[MP Webhook] Processing error:', error);
+        return NextResponse.json(
+            // Return 200 to prevent MP retries on our internal errors
+            { received: false, error: 'Internal error' },
+            { status: 200 }
+        );
     }
 }

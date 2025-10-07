@@ -14,13 +14,14 @@ type Props = {
 
 export default function AuthForm({ mode, onSubmit }: Props) {
   const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { mergeGuestCart } = useCartStore();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
+    setLoading(true);
     const formData = new FormData(e.currentTarget);
     const redirectTo = searchParams.get('redirect') || '/';
 
@@ -39,6 +40,7 @@ export default function AuthForm({ mode, onSubmit }: Props) {
     } catch (e) {
       console.log("error", e);
     }
+    finally { setLoading(false); }
   }
 
   return (
@@ -131,7 +133,7 @@ export default function AuthForm({ mode, onSubmit }: Props) {
           </div>
         </div>
 
-      
+
 
         {mode === "sign-up" && (
           <div className="space-y-3 pt-2">
@@ -144,8 +146,8 @@ export default function AuthForm({ mode, onSubmit }: Props) {
               />
               <span className="text-footnote text-dark-700 font-roboto leading-relaxed">
                 Acepto los{" "}
-                <Link 
-                  href="/legal?tab=terms" 
+                <Link
+                  href="/legal?tab=terms"
                   className="underline hover:text-dark-900 transition-colors"
                   target="_blank"
                 >
@@ -163,8 +165,8 @@ export default function AuthForm({ mode, onSubmit }: Props) {
               />
               <span className="text-footnote text-dark-700 font-roboto leading-relaxed">
                 Acepto la{" "}
-                <Link 
-                  href="/legal?tab=privacy" 
+                <Link
+                  href="/legal?tab=privacy"
                   className="underline hover:text-dark-900 transition-colors"
                   target="_blank"
                 >
@@ -175,10 +177,17 @@ export default function AuthForm({ mode, onSubmit }: Props) {
             </label>
           </div>
         )}
-          <Button
-          type="submit" fullWidth
+        <Button
+          type="submit" fullWidth disabled={loading}
         >
-          {mode === "sign-in" ? "Iniciar Sesion" : "Crear Cuenta"}
+          {loading
+            ? mode === "sign-in"
+              ? "Iniciando sesión..."
+              : "Creando cuenta..."
+            : mode === "sign-in"
+              ? "Iniciar Sesión"
+              : "Crear Cuenta"
+          }
         </Button>
       </form>
     </div>

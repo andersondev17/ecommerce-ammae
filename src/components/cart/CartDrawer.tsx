@@ -4,13 +4,14 @@ import { Drawer, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader } from "
 import { formatPrice } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
 
 export function CartDrawer() {
     const [open, setOpen] = useState(false);
     const { lastAddedItem } = useCartStore();
-
+    const router = useRouter();
     // Abrir drawer cuando hay nuevo item
     useEffect(() => {
         if (lastAddedItem) {
@@ -21,7 +22,7 @@ export function CartDrawer() {
     //  Limpiar flag cuando el drawer se cierra
     const handleOpenChange = (isOpen: boolean) => {
         setOpen(isOpen);
-        if (!isOpen) 
+        if (!isOpen)
             useCartStore.setState({ lastAddedItem: null });
     };
 
@@ -97,7 +98,9 @@ export function CartDrawer() {
 
                     <DrawerFooter className="flex-col gap-3">
                         <DrawerClose asChild>
-                            <Button href="/cart" variant="primary" size="md" fullWidth ariaLabel="Ver Carrito">
+                            <Button onClick={() => { router.push("/cart"); }}
+                                variant="primary" size="md" fullWidth aria-label="Ver Carrito"
+                            >
                                 Ver su cesta
                             </Button>
                         </DrawerClose>

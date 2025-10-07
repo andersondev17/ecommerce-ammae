@@ -99,19 +99,19 @@ export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
             .where(eq(cartItems.cartId, cart.id));
 
         if (items.length === 0) {
-            return { success: false, error: "Cart is empty" };
+            return { success: false, error: "El carrito está vacío" };
         }
 
         // Calculate total
         const subtotal = items.reduce((sum, item) => {
-            const price = item.salePrice ?? item.price;
+            const price = Number(item.salePrice ?? item.price);
             return sum + (price * item.quantity);
         }, 0);
 
         const total = subtotal + 0; // Shipping in COP
 
         return method === 'mercadopago'
-            ? handleMercadoPagoCheckout({ items, total, userId: user?.id, cartId: cart.id , userEmail: user?.email})
+            ? handleMercadoPagoCheckout({ items, total, userId: user?.id, cartId: cart.id, userEmail: user?.email })
             : handleWhatsAppCheckout({ items, total, userId: user?.id, cartId: cart.id });
 
     } catch (error) {
@@ -130,13 +130,14 @@ interface CheckoutItem {
     imageUrl: string | null;
     productVariantId: string;
 }
-async function handleMercadoPagoCheckout({ items, total, userId, cartId , userEmail}: {
+async function handleMercadoPagoCheckout({ items, total, userId, cartId, userEmail }: {
     items: CheckoutItem[];
     total: number;
     userId?: string;
     userEmail?: string;
     cartId: string;
 }) {
+    let orderId: string | null = null;
     try {
         const result = await db.transaction(async (tx) => {
             await validateStock(items, tx);
@@ -171,6 +172,8 @@ async function handleMercadoPagoCheckout({ items, total, userId, cartId , userEm
             return newOrder;
         }); // If any step fails, everything is automatically rolled back.
 
+        orderId = result.id;
+
         // 4. Create Mercado Pago preference (outside the transaction)
         const checkoutUrl = await createMercadoPagoPreference({
             cartId: result.id,
@@ -179,22 +182,39 @@ async function handleMercadoPagoCheckout({ items, total, userId, cartId , userEm
             amount: total,
             items: items.map(item => ({
                 name: item.productName,
-                price: item.salePrice ?? item.price,
+                price: Number(item.salePrice ?? item.price),
                 quantity: item.quantity,
             })),
         });
+        console.log('Items para MP:', items.map(item => ({
+            name: item.productName,
+            price: Number(item.salePrice ?? item.price),
+            type: typeof Number(item.salePrice ?? item.price)
+        })));
 
         return { success: true, checkoutUrl, orderId: result.id };
 
     } catch (error) {
-        console.error('MercadoPago checkout error:', error);
+        console.error('[MP Checkout] Error:', error);
+
+        // ROLLBACK MANUAL: Cancelar orden si MP falla
+        if (orderId) {
+            try {
+                await db.update(orders)
+                    .set({ status: "cancelled" })
+                    .where(eq(orders.id, orderId));
+                console.log(`[MP Checkout] Order ${orderId} cancelled due to MP error`);
+            } catch (rollbackError) {
+                console.error('[MP Checkout] Rollback failed:', rollbackError);
+            }
+        }
+
         return {
             success: false,
             error: error instanceof Error ? error.message : 'MercadoPago checkout failed'
         };
     }
 }
-
 async function handleWhatsAppCheckout({ items, total, userId, cartId }: {
     items: CheckoutItem[];
     total: number;
@@ -216,7 +236,7 @@ async function handleWhatsAppCheckout({ items, total, userId, cartId }: {
                     orderId: newOrder.id,
                     productVariantId: item.productVariantId,
                     quantity: item.quantity,
-                    priceAtPurchase: (item.salePrice ?? item.price).toString(),
+                    priceAtPurchase: (Number(item.salePrice ?? item.price)).toString(),
                 }))
             );
 
@@ -236,9 +256,10 @@ async function handleWhatsAppCheckout({ items, total, userId, cartId }: {
         const shortOrderId = result.id.slice(-8).toUpperCase();
         const shortUserId = userId?.slice(-8).toUpperCase();
 
-        const itemsTxt = items.map(item =>
-            `• ${item.quantity}x ${item.productName} - ${formatPrice((item.salePrice ?? item.price) * item.quantity)}`
-        ).join('\n');
+        const itemsTxt = items.map(item => {
+            const price = Number(item.salePrice ?? item.price);
+            return `• ${item.quantity}x ${item.productName} - ${formatPrice(price * item.quantity)}`;
+        }).join('\n');
 
         const message = encodeURIComponent(
             `*¡Tu pedido ya está listo para confirmar!*\n\n` +

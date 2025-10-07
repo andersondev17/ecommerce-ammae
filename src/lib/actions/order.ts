@@ -3,8 +3,8 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { addresses, orderItems, orders, payments } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { addresses, orderItems, orders, payments, productVariants } from "@/lib/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "../auth/actions";
 
@@ -15,12 +15,15 @@ export async function createOrder(payload: {
     transactionId?: string;
     paidAt?: Date;
 }) {
-    // actualiza order + payment
     const { orderId, paymentMethod, status, transactionId, paidAt } = payload;
 
-    await db.update(orders).set({ status }).where(eq(orders.id, orderId));
+    // 1. Actualizar estado de orden + inventario (si es paid)
+    const statusResult = await updateOrderStatus(orderId, status);
+    if (!statusResult.success) {
+        throw new Error(`Failed to update order status: ${statusResult.error}`);
+    }
 
-    // actualizar payment (idempotente)
+    // 2. Actualizar payment record (tu código existente)
     const existing = await db.select().from(payments).where(eq(payments.orderId, orderId)).limit(1);
     if (existing.length) {
         await db.update(payments).set({
@@ -49,23 +52,75 @@ export async function getOrder(orderId: string) {
     return { order: ord[0], items, payments: pays };
 }
 
-export async function updateOrderStatus(orderId: string, status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled') {
+export async function updateOrderStatus(
+    orderId: string,
+    status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled'
+) {
+    const user = await getCurrentUser();
+
+    // Solo admin o sistema pueden cambiar estados
+    if (!user?.id) {
+        return { success: false, error: "Unauthorized" };
+    }
     try {
-        await db
-            .update(orders)
-            .set({ status })
-            .where(eq(orders.id, orderId));
+        //  TRANSACCIÓN ATÓMICA para estado + inventario
+        await db.transaction(async (tx) => {
+            // 1. Obtener orden actual e items CON LOCK
+            const [currentOrder] = await tx
+                .select()
+                .from(orders)
+                .where(eq(orders.id, orderId))
+                .for('update'); // Lock para evitar race conditions
+
+            if (!currentOrder) {
+                throw new Error(`Order ${orderId} not found`);
+            }
+
+            const orderItemsList = await tx
+                .select()
+                .from(orderItems)
+                .where(eq(orderItems.orderId, orderId));
+
+            // 2. Control de inventario basado en cambio de estado
+            if (status === 'paid' && currentOrder.status !== 'paid') {
+                //  DECREMENTAR stock - orden confirmada
+                for (const item of orderItemsList) {
+                    await tx.update(productVariants)
+                        .set({
+                            inStock: sql`${productVariants.inStock} - ${item.quantity}`
+                        })
+                        .where(eq(productVariants.id, item.productVariantId));
+                }
+                console.log(`📦 Stock decreased for order ${orderId}`);
+
+            } else if (status === 'cancelled' && currentOrder.status === 'paid') {
+                // ✅ INCREMENTAR stock - cancelación después de pago
+                for (const item of orderItemsList) {
+                    await tx.update(productVariants)
+                        .set({
+                            inStock: sql`${productVariants.inStock} + ${item.quantity}`
+                        })
+                        .where(eq(productVariants.id, item.productVariantId));
+                }
+                console.log(`🔄 Stock restored for cancelled order ${orderId}`);
+            }
+
+            // 3. Actualizar estado de la orden
+            await tx.update(orders)
+                .set({ status })
+                .where(eq(orders.id, orderId));
+        });
 
         return { success: true };
+
     } catch (error) {
-        console.error('Error updating order status:', error);
+        console.error('Error updating order status and inventory:', error);
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Failed to update order status',
+            error: error instanceof Error ? error.message : 'Failed to update order status'
         };
     }
 }
-
 export type AddressData = {
     line1: string;
     line2?: string;

@@ -3,11 +3,59 @@
 import { getCurrentUser, guestSession } from "@/lib/auth/actions";
 import { db } from "@/lib/db";
 import { addresses, cartItems, carts, guests, orderItems, orders, payments, productImages, productVariants, products } from "@/lib/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { createMercadoPagoPreference } from "../payments/mercadopagoClient";
 import { formatPrice } from "../utils";
-import { mergeCarts } from "./cart";
+import { DbClient, mergeCarts } from "./cart";
 
+// SAGA pattern to handle checkout
+async function getActiveCart() {
+    const user = await getCurrentUser();
+    const guest = await guestSession();
+
+    if (user?.id) {
+        const [cart] = await db
+            .select()
+            .from(carts)
+            .where(eq(carts.userId, user.id))
+            .limit(1);
+        return cart ?? null;
+    }
+
+    if (guest.sessionToken) {
+        const result = await db
+            .select({
+                cart: carts,
+            })
+            .from(guests)    //  LEFT JOIN para guests
+            .leftJoin(carts, eq(carts.guestId, guests.id))
+            .where(eq(guests.sessionToken, guest.sessionToken))
+            .limit(1);
+
+        return result[0]?.cart ?? null;
+    }
+
+    return null;
+}
+async function validateStock(items: CheckoutItem[], tx: DbClient) {
+    const variantIds = items.map(i => i.productVariantId);
+
+    const variants = await tx
+        .select({ id: productVariants.id, inStock: productVariants.inStock })
+        .from(productVariants)
+        .where(inArray(productVariants.id, variantIds))
+        .for('update');// Lock until the transaction ends
+
+    const stockMap = new Map(variants.map(v => [v.id, v.inStock]));
+
+    for (const item of items) {
+        const stock = stockMap.get(item.productVariantId);
+        if (!stock || stock < item.quantity) {
+            throw new Error(`Stock insuficiente: ${item.productName}`);
+        }
+    }
+}
+// Enhanced payment processing with better error handling
 export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
     console.log(`Starting checkout with method: ${method}`);
 
@@ -25,28 +73,7 @@ export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
         }
 
         // Get cart
-        let cart;
-        if (user?.id) {
-            [cart] = await db
-                .select()
-                .from(carts)
-                .where(eq(carts.userId, user.id))
-                .limit(1);
-        } else if (guest.sessionToken) {
-            const [guestRecord] = await db
-                .select()
-                .from(guests)
-                .where(eq(guests.sessionToken, guest.sessionToken))
-                .limit(1);
-
-            if (guestRecord) {
-                [cart] = await db
-                    .select()
-                    .from(carts)
-                    .where(eq(carts.guestId, guestRecord.id))
-                    .limit(1);
-            }
-        }
+        const cart = await getActiveCart();
 
         if (!cart) {
             return { success: false, error: "No cart found" };
@@ -81,24 +108,11 @@ export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
             return sum + (price * item.quantity);
         }, 0);
 
-        const total = subtotal + 10000; // Shipping in COP
+        const total = subtotal + 0; // Shipping in COP
 
-        console.log(`Total: $${total} COP`);
-
-        if (method === 'mercadopago') {
-            return await handleMercadoPagoCheckout({
-                items,
-                total,
-                userId: user?.id,
-            });
-        } else {
-            return await handleWhatsAppCheckout({
-                items,
-                total,
-                userId: user?.id,
-                cartId: cart.id,
-            });
-        }
+        return method === 'mercadopago'
+            ? handleMercadoPagoCheckout({ items, total, userId: user?.id, cartId: cart.id , userEmail: user?.email})
+            : handleWhatsAppCheckout({ items, total, userId: user?.id, cartId: cart.id });
 
     } catch (error) {
         console.error('Checkout error:', error);
@@ -116,43 +130,52 @@ interface CheckoutItem {
     imageUrl: string | null;
     productVariantId: string;
 }
-async function handleMercadoPagoCheckout({ items, total, userId }: {
+async function handleMercadoPagoCheckout({ items, total, userId, cartId , userEmail}: {
     items: CheckoutItem[];
     total: number;
     userId?: string;
+    userEmail?: string;
+    cartId: string;
 }) {
     try {
-        // 1. Crear orden en BD ANTES de crear preferencia MP
-        const [newOrder] = await db.insert(orders).values({
-            userId: userId ?? null,
-            status: "pending",
-            totalAmount: total.toFixed(2),
-            createdAt: new Date(),
-        }).returning();
+        const result = await db.transaction(async (tx) => {
+            await validateStock(items, tx);
 
-        const orderId = newOrder.id;
+            // 1. Create order
+            const [newOrder] = await tx.insert(orders).values({
+                userId: userId ?? null,
+                status: "pending",
+                totalAmount: total.toFixed(2),
+                createdAt: new Date(),
+            }).returning();
 
-        // 2. Insertar items de la orden
-        await db.insert(orderItems).values(
-            items.map(item => ({
-                orderId,
-                productVariantId: item.productVariantId,
-                quantity: item.quantity,
-                priceAtPurchase: (item.salePrice ?? item.price).toString(),
-            }))
-        );
-        // 3. Crear payment record inicial
-        await db.insert(payments).values({
-            orderId,
-            method: "mercadopago",
-            status: "initiated",
-            transactionId: `MP-${orderId}`,
-        });
+            // 2. Insert order items
+            await tx.insert(orderItems).values(
+                items.map(item => ({
+                    orderId: newOrder.id,
+                    productVariantId: item.productVariantId,
+                    quantity: item.quantity,
+                    priceAtPurchase: (item.salePrice ?? item.price).toString(),
+                }))
+            );
 
-        // 4. Crear preferencia MP y DEVOLVER URL para client-side redirect
+            // 3. Create payment record
+            await tx.insert(payments).values({
+                orderId: newOrder.id,
+                method: "mercadopago",
+                status: "initiated",
+                transactionId: `pref-${newOrder.id}`
+            });
+            await tx.delete(cartItems).where(eq(cartItems.cartId, cartId));
+
+            return newOrder;
+        }); // If any step fails, everything is automatically rolled back.
+
+        // 4. Create Mercado Pago preference (outside the transaction)
         const checkoutUrl = await createMercadoPagoPreference({
-            cartId: orderId, // external_reference
+            cartId: result.id,
             userId: userId,
+            userEmail: userEmail,
             amount: total,
             items: items.map(item => ({
                 name: item.productName,
@@ -161,10 +184,7 @@ async function handleMercadoPagoCheckout({ items, total, userId }: {
             })),
         });
 
-        console.log('MP Checkout URL created:', checkoutUrl);
-
-        // cliente manejará redirect
-        return { success: true, checkoutUrl, orderId };
+        return { success: true, checkoutUrl, orderId: result.id };
 
     } catch (error) {
         console.error('MercadoPago checkout error:', error);
@@ -175,89 +195,71 @@ async function handleMercadoPagoCheckout({ items, total, userId }: {
     }
 }
 
-async function handleWhatsAppCheckout({ items, total, userId , cartId }: {
+async function handleWhatsAppCheckout({ items, total, userId, cartId }: {
     items: CheckoutItem[];
     total: number;
     userId?: string;
-    cartId: string
+    cartId: string;
 }) {
     try {
-        // 1. Crear orden en BD
-        const [newOrder] = await db.insert(orders).values({
-            userId: userId ?? null,
-            status: "pending",
-            totalAmount: total.toFixed(2),
-            createdAt: new Date(),
-        }).returning();
+        const result = await db.transaction(async (tx) => {
+            await validateStock(items, tx);
+            const [newOrder] = await tx.insert(orders).values({
+                userId: userId ?? null,
+                status: "pending",
+                totalAmount: total.toFixed(2),
+                createdAt: new Date(),
+            }).returning();
 
-        const orderId = newOrder.id;
+            await tx.insert(orderItems).values(
+                items.map(item => ({
+                    orderId: newOrder.id,
+                    productVariantId: item.productVariantId,
+                    quantity: item.quantity,
+                    priceAtPurchase: (item.salePrice ?? item.price).toString(),
+                }))
+            );
 
-        // 2. Insertar items
-        await db.insert(orderItems).values(
-            items.map(item => ({
-                orderId,
-                productVariantId: item.productVariantId,
-                quantity: item.quantity,
-                priceAtPurchase: (item.salePrice ?? item.price).toString(),
-            }))
-        );
-        // 3. Crear payment record
-        await db.insert(payments).values({
-            orderId,
-            method: "whatsapp",
-            status: "initiated",
-            transactionId: `WA-${orderId}`,
+            await tx.insert(payments).values({
+                orderId: newOrder.id,
+                method: "whatsapp",
+                status: "initiated",
+                transactionId: `WA-${newOrder.id}`,
+            });
+            await tx.delete(cartItems).where(eq(cartItems.cartId, cartId));
+            return newOrder;
         });
-        await db.delete(cartItems).where(eq(cartItems.cartId, cartId));
-         const { invalidateCartCache } = await import('./cart');
-        invalidateCartCache(cartId);
-        
-        const shortOrderId = orderId.slice(-8).toUpperCase();
-        const shortUserId = userId?.slice(-8).toUpperCase();
 
-        // 4. Generar WhatsApp URL y DEVOLVERLA
         const phone = process.env.WHATSAPP_NUMBER?.replace(/\D/g, "") ?? "";
-        if (!phone) {
-            throw new Error("WHATSAPP_NUMBER not configured");
-        }
-        const totalFmt = (amount: number) =>
-            new Intl.NumberFormat("es-CO", {
-                style: "currency",
-                currency: "COP",
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-            }).format(amount);
+        if (!phone) throw new Error("WHATSAPP_NUMBER not configured");
+
+        const shortOrderId = result.id.slice(-8).toUpperCase();
+        const shortUserId = userId?.slice(-8).toUpperCase();
 
         const itemsTxt = items.map(item =>
             `• ${item.quantity}x ${item.productName} - ${formatPrice((item.salePrice ?? item.price) * item.quantity)}`
         ).join('\n');
 
         const message = encodeURIComponent(
-            ` *¡Tu pedido ya está listo para confirmar!*\n\n` +
-            ` *Orden #${shortOrderId}*\n` +
+            `*¡Tu pedido ya está listo para confirmar!*\n\n` +
+            `*Orden #${shortOrderId}*\n` +
             `${itemsTxt}\n\n` +
-            // 4. CALL the totalFmt function to format the subtotal and total
-            ` *Envío:* $10.000\n` +
-            ` *Total:* ${totalFmt(total)}\n\n` +
-            ` Cliente: ${shortUserId ?? "Invitado"}\n\n` +
-            ` Tu pedido será enviado cuando confirmemos el pago.`
+            `*Envío:* GRATIS\n` +
+            `*Total:* ${formatPrice(total)}\n\n` +
+            `Cliente: ${shortUserId ?? "Invitado"}\n\n` +
+            `Tu pedido será enviado cuando confirmemos el pago.`
         );
 
         const whatsappUrl = `https://wa.me/${phone}?text=${message}`;
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
+        const successUrl = `${baseUrl}/checkout/success?order_id=${result.id}&method=whatsapp&wa_url=${encodeURIComponent(whatsappUrl)}`;
 
-        console.log('WhatsApp URL created:', whatsappUrl);
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        const successUrl = `${baseUrl}/checkout/success?order_id=${orderId}&method=whatsapp&wa_url=${encodeURIComponent(whatsappUrl)}`;
-
-
-        //  cliente manejará redirect
         return {
             success: true,
             checkoutUrl: successUrl,
-            orderId,
+            orderId: result.id,
             whatsappUrl
-        }
-
+        };
 
     } catch (error) {
         console.error('WhatsApp checkout error:', error);

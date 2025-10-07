@@ -30,66 +30,66 @@ export function CartSummary({ items }: CartSummaryProps) {
         return sum + (price * item.quantity);
     }, 0);
 
-    const shipping = 10000;
+    const shipping = 0;
     const total = subtotal + shipping;
     const router = useRouter();
 
-   const handlePay = (method: "mercadopago" | "whatsapp") => {
-    startTransition(async () => {
-        try {
-            const validation = await validateCheckoutRequirements();
+    const handlePay = (method: "mercadopago" | "whatsapp") => {
+        startTransition(async () => {
+            try {
+                const validation = await validateCheckoutRequirements();
 
-            if (!validation.success) {
-                toast.error("Error al validar checkout");
-                return;
+                if (!validation.success) {
+                    toast.error("Error al validar checkout");
+                    return;
+                }
+
+                if (validation.requiresAuth) {
+                    toast.error("Debes iniciar sesión para continuar");
+                    router.push("/sign-in?redirect=/cart");
+                    return;
+                }
+
+                if (validation.requiresAddress) {
+                    toast.error("Necesitas agregar una dirección de envío");
+                    router.push("/checkout/address");
+                    return;
+                }
+
+                console.log('Calling handleCheckout...');
+                const result = await handleCheckout(method);
+                console.log('Result:', result);
+
+                if ('error' in result) {
+                    console.error('Checkout failed:', result.error);
+                    toast.error(result.error);
+                    return;
+                }
+
+                if ('checkoutUrl' in result && result.checkoutUrl) {
+                    console.log('Redirecting to:', result.checkoutUrl);
+
+                    // CAMBIO: Limpiar ANTES del redirect con timeout
+                    const { clearAfterCheckout } = useCartStore.getState();
+                    clearAfterCheckout();
+
+                    // Forzar flush del localStorage antes del redirect
+                    setTimeout(() => {
+                        window.location.href = result.checkoutUrl;
+                    }, 150);
+
+                    return;
+                }
+
+                console.error('No checkoutUrl found in result');
+                toast.error("No se pudo generar la URL de pago");
+
+            } catch (error) {
+                console.error("Checkout exception:", error);
+                toast.error("Error al iniciar el pago. Intenta nuevamente.");
             }
-
-            if (validation.requiresAuth) {
-                toast.error("Debes iniciar sesión para continuar");
-                router.push("/sign-in?redirect=/cart");
-                return;
-            }
-
-            if (validation.requiresAddress) {
-                toast.error("Necesitas agregar una dirección de envío");
-                router.push("/checkout/address");
-                return;
-            }
-
-            console.log('Calling handleCheckout...');
-            const result = await handleCheckout(method);
-            console.log('Result:', result);
-
-            if ('error' in result) {
-                console.error('Checkout failed:', result.error);
-                toast.error(result.error);
-                return;
-            }
-
-            if ('checkoutUrl' in result && result.checkoutUrl) {
-                console.log('Redirecting to:', result.checkoutUrl);
-                
-                // CAMBIO: Limpiar ANTES del redirect con timeout
-                const { clearAfterCheckout } = useCartStore.getState();
-                clearAfterCheckout();
-                
-                // Forzar flush del localStorage antes del redirect
-                setTimeout(() => {
-                    window.location.href = result.checkoutUrl;
-                }, 150);
-                
-                return;
-            }
-
-            console.error('No checkoutUrl found in result');
-            toast.error("No se pudo generar la URL de pago");
-
-        } catch (error) {
-            console.error("Checkout exception:", error);
-            toast.error("Error al iniciar el pago. Intenta nuevamente.");
-        }
-    });
-};
+        });
+    };
 
 
     return (
@@ -102,7 +102,7 @@ export function CartSummary({ items }: CartSummaryProps) {
 
                 <div className="flex justify-between items-center">
                     <span className="text-heading-4 text-dark-900 font-roboto font-light">Envío</span>
-                    <span className="text-lg text-dark-900 font-light font-roboto">{formatPrice(shipping)}</span>
+                    <span className="text-lg text-dark-900 font-light font-roboto">{shipping === 0 ? 'GRATIS' : formatPrice(shipping)}</span>
                 </div>
             </div>
 

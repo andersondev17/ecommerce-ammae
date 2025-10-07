@@ -47,53 +47,47 @@ export type CartData = {
     itemCount: number;
 };
 
-async function getOrCreateCart() {
+export type DbClient = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function getOrCreateCart(txClient?: DbClient) {
+    const client = txClient ?? db;
     const user = await getCurrentUser();
     const guest = await guestSession();
 
-    const cacheKey = `cart-${user?.id || guest.sessionToken}`;
-    if (cartCache.has(cacheKey)) {
-        return cartCache.get(cacheKey);
+    if (!txClient) {
+        const cacheKey = `cart-${user?.id || guest.sessionToken}`;
+        if (cartCache.has(cacheKey)) {
+            return cartCache.get(cacheKey);
+        }
     }
 
     let cart;
 
-    // Try to get existing cart
     if (user?.id) {
-        [cart] = await db
-            .select()
+        [cart] = await client.select()
             .from(carts)
             .where(eq(carts.userId, user.id))
             .limit(1);
     } else if (guest.sessionToken) {
-        // Get guest record by sessionToken to find the actual guest.id
-        const [guestRecord] = await db
-            .select()
+        const [guestRecord] = await client.select()
             .from(guests)
             .where(eq(guests.sessionToken, guest.sessionToken))
             .limit(1);
 
         if (guestRecord) {
-            [cart] = await db
-                .select()
+            [cart] = await client.select()
                 .from(carts)
                 .where(eq(carts.guestId, guestRecord.id))
                 .limit(1);
         }
     }
 
-    // Create new cart if needed
     if (!cart) {
         if (user?.id) {
-            [cart] = await db
-                .insert(carts)
-                .values({
-                    userId: user.id,
-                    guestId: null
-                })
+            [cart] = await client.insert(carts)
+                .values({ userId: user.id, guestId: null })
                 .returning();
         } else {
-            // Create or get guest session
             const sessionResult = guest.sessionToken
                 ? { ok: true, sessionToken: guest.sessionToken }
                 : await createGuestSession();
@@ -102,9 +96,7 @@ async function getOrCreateCart() {
                 throw new Error("Failed to create guest session");
             }
 
-            // Get the guest record by sessionToken
-            const [guestRecord] = await db
-                .select()
+            const [guestRecord] = await client.select()
                 .from(guests)
                 .where(eq(guests.sessionToken, sessionResult.sessionToken))
                 .limit(1);
@@ -113,16 +105,17 @@ async function getOrCreateCart() {
                 throw new Error("Failed to find guest record");
             }
 
-            [cart] = await db
-                .insert(carts)
-                .values({
-                    guestId: guestRecord.id,
-                    userId: null
-                })
+            [cart] = await client.insert(carts)
+                .values({ guestId: guestRecord.id, userId: null })
                 .returning();
         }
     }
-    cartCache.set(cacheKey, cart);
+
+    if (!txClient) {
+        const cacheKey = `cart-${user?.id || guest.sessionToken}`;
+        cartCache.set(cacheKey, cart);
+    }
+
     return cart;
 }
 
@@ -215,38 +208,48 @@ export async function getCart(): Promise<{ success: boolean; data: CartData }> {
 export async function addCartItem(input: z.infer<typeof addCartItemSchema>) {
     try {
         const validatedData = addCartItemSchema.parse(input);
-        const cart = await getOrCreateCart();
+        await db.transaction(async (tx) => {
+            const [variant] = await tx.select()
+                .from(productVariants)
+                .where(eq(productVariants.id, validatedData.productVariantId))
+                .for('update');
 
-        // Check if item already exists in cart
-        const existingItem = await db
-            .select()
-            .from(cartItems)
-            .where(and(
-                eq(cartItems.cartId, cart.id),
-                eq(cartItems.productVariantId, validatedData.productVariantId)
-            ))
-            .limit(1);
+            if (!variant || variant.inStock < validatedData.quantity) {
+                throw new Error('Producto sin stock disponible');
+            }
 
-        if (existingItem.length > 0) {
-            await db
-                .update(cartItems)
-                .set({
-                    quantity: sql`${cartItems.quantity} + ${validatedData.quantity}`
-                })
-                .where(eq(cartItems.id, existingItem[0].id));
-        } else {
-            await db
-                .insert(cartItems)
-                .values({
-                    cartId: cart.id,
-                    productVariantId: validatedData.productVariantId,
-                    quantity: validatedData.quantity,
-                });
-        }
+            const cart = await getOrCreateCart(tx);
 
-        // Invalidate specific cache instead of full revalidation
-        cartCache.delete(`cart-items-${cart.id}`);
-        revalidatePath("/cart", "page");
+            // Check if item already exists in cart
+            const existingItem = await tx.select()
+                .from(cartItems)
+                .where(and(
+                    eq(cartItems.cartId, cart.id),
+                    eq(cartItems.productVariantId, validatedData.productVariantId)
+                ))
+                .limit(1);
+
+            if (existingItem.length > 0) {
+                // Update using 'tx'
+                await tx.update(cartItems)
+                    .set({
+                        quantity: sql`${cartItems.quantity} + ${validatedData.quantity}`
+                    })
+                    .where(eq(cartItems.id, existingItem[0].id));
+            } else {
+                // Insert using 'tx'
+                await tx.insert(cartItems)
+                    .values({
+                        cartId: cart.id,
+                        productVariantId: validatedData.productVariantId,
+                        quantity: validatedData.quantity,
+                    });
+            }
+
+            // Invalidate specific cache instead of full revalidation
+            cartCache.delete(`cart-items-${cart.id}`);
+            revalidatePath("/cart", "page");
+        });
         return { success: true };
     } catch (error) {
         console.error("Error adding item to cart:", error);
@@ -258,34 +261,41 @@ export async function addCartItem(input: z.infer<typeof addCartItemSchema>) {
 }
 
 export async function updateCartItem(input: z.infer<typeof updateCartItemSchema>) {
-    try {
-        const validatedData = updateCartItemSchema.parse(input);
-        const cart = await getOrCreateCart();
+    const validatedData = updateCartItemSchema.parse(input);
+    
+    if (validatedData.quantity === 0) {
+        return await removeCartItem(validatedData.productVariantId);
+    }
 
-        if (validatedData.quantity === 0) {
-            return await removeCartItem(validatedData.productVariantId);
+    await db.transaction(async (tx) => {
+        const cart = await getOrCreateCart(tx);
+        
+        const [variant] = await tx.select({ inStock: productVariants.inStock })
+            .from(productVariants)
+            .innerJoin(cartItems, eq(cartItems.productVariantId, productVariants.id))
+            .where(and(
+                eq(cartItems.cartId, cart.id),
+                eq(cartItems.productVariantId, validatedData.productVariantId)
+            ))
+            .for('update');
+
+        if (!variant || variant.inStock < validatedData.quantity) {
+            throw new Error('Stock insuficiente');
         }
 
-        await db
-            .update(cartItems)
+        await tx.update(cartItems)
             .set({ quantity: validatedData.quantity })
             .where(and(
                 eq(cartItems.cartId, cart.id),
                 eq(cartItems.productVariantId, validatedData.productVariantId)
             ));
 
-        revalidatePath("/cart");
-        revalidatePath("/");
-        return { success: true };
-    } catch (error) {
-        console.error("Error updating cart item:", error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : "Failed to update cart item"
-        };
-    }
-}
+        cartCache.delete(`cart-items-${cart.id}`);
+    });
 
+    revalidatePath("/cart");
+    return { success: true };
+}
 export async function removeCartItem(productVariantId: string) {
     try {
         const cart = await getOrCreateCart();

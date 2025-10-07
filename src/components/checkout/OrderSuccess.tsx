@@ -144,7 +144,7 @@ export default function OrderSuccess({
                                 </div>
                                 <div className="flex justify-between text-sm text-dark-700 font-roboto font-light">
                                     <span>Envío</span>
-                                    <span>{formatPrice(10000)}</span>
+                                    <span>GRATIS</span>
                                 </div>
                                 <div className="pt-3 border-t border-light-300 flex justify-between text-base md:text-lg text-dark-900 font-roboto-slab">
                                     <span>Total</span>

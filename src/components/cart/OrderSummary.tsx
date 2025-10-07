@@ -19,7 +19,7 @@ export function OrderSummary({ subtotal = 0, total = 0, isLoading, onCheckout }:
 
                     <div className="flex justify-between text-gray-700">
                         <span>Estimado envío y manejo</span>
-                        <span>$10.000</span>
+                        <span>GRATIS</span>
                     </div>
 
                     <div className="border-t border-gray-200 pt-4">

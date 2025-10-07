@@ -2,6 +2,8 @@ import { Card } from "@/components";
 import Hero from "@/components/Hero";
 import { getAllProducts } from "@/lib/actions/product";
 
+export const dynamic = 'force-dynamic';
+
 const Home = async () => {
   const { products } = await getAllProducts({ limit: 3, sort: "newest" });
 

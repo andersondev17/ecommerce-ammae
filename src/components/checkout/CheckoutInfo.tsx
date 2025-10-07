@@ -1,6 +1,6 @@
 "use client";
 
-import { INFO_ITEMS } from "@/lib/constats";
+import { INFO_ITEMS } from "@/constats";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 

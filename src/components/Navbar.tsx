@@ -2,11 +2,12 @@
 
 import { formatCategory } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
-import { ShoppingBagIcon, UserIcon } from "lucide-react";
+import { ShoppingBagIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import UserSection from "./UserSection";
 
 const SUBCATEGORIES = {
   men: ["jeans", "camisetas", "hoodies"],
@@ -101,9 +102,8 @@ export default function Navbar() {
           </ul>
 
           <div className="flex items-center gap-4">
-            <Link href="/sign-in" className="flex md:hidden items-center group" aria-label="Sign in">
-              <UserIcon className={`h-4 w-4 sm:h-5 sm:w-5 transition-all duration-200 ${navClasses.icon} group-hover/nav:text-gray-700`} />
-            </Link>
+             <UserSection navClasses={navClasses} />
+
             <Link href="/cart" className="relative flex items-center gap-2 group" aria-label="View cart">
               <ShoppingBagIcon className={`h-4 w-4 sm:h-5 sm:w-5 transition-all duration-200 ${navClasses.icon} group-hover/nav:text-gray-700`} />
               {itemCount > 0 && (

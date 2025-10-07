@@ -33,7 +33,7 @@ export default function UserMenu({ user, variant = "default" }: UserMenuProps) {
             try {
                 await signOut();
                 router.push("/");
-            } catch (error) {
+            } catch {
                 toast.error("Error al cerrar sesión");
             }
         });
@@ -46,23 +46,31 @@ export default function UserMenu({ user, variant = "default" }: UserMenuProps) {
         .toUpperCase()
         .slice(0, 2) || user.email[0].toUpperCase();
 
-    const iconClasses = variant === "navbar"
-        ? "h-4 w-4 sm:h-8 sm:w-5"
-        : "h-4 w-4";
+    const sizeClasses = variant === "navbar"
+        ? "h-9 w-9 sm:h-10 sm:w-10"
+        : "h-9 w-9";
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
-                    className="flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-dark-500 rounded-full"
+                    className="group relative focus:outline-none"
                     disabled={isPending}
                 >
-                    <Avatar className={iconClasses}>
-                        <AvatarImage src={user.image || undefined} alt={`Foto de perfil de ${user.name || user.email}`} />
-                        <AvatarFallback className="bg-dark-900 text-light-100 text-xs font-roboto">
-                            {initials}
-                        </AvatarFallback>
-                    </Avatar>
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-br from-dark-500/40 to-dark-700/40 blur-sm group-hover:blur-md transition-all duration-300" />
+
+                    <div className="relative ring-2 ring-dark-500/60 rounded-full 
+                                    group-hover:ring-dark-400 group-hover:scale-105 
+                                    group-active:scale-95
+                                    focus-visible:ring-dark-300 focus-visible:ring-offset-2 focus-visible:ring-offset-light-100
+                                    transition-all duration-200 ease-out">
+                        <Avatar className={sizeClasses}>
+                            <AvatarImage src={user.image || undefined} alt={`Foto de perfil de ${user.name || user.email}`} className="object-cover" />
+                            <AvatarFallback className="bg-dark-900 text-light-100 text-xs font-roboto font-medium">
+                                {initials}
+                            </AvatarFallback>
+                        </Avatar>
+                    </div>
                 </button>
             </DropdownMenuTrigger>
 

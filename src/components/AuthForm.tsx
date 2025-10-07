@@ -131,24 +131,55 @@ export default function AuthForm({ mode, onSubmit }: Props) {
           </div>
         </div>
 
-        <Button
+      
+
+        {mode === "sign-up" && (
+          <div className="space-y-3 pt-2">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                name="terms_accepted"
+                required
+                className="mt-0.5 h-4 w-4 rounded border-light-300 text-dark-900 focus:ring-dark-900 focus:ring-2"
+              />
+              <span className="text-footnote text-dark-700 font-roboto leading-relaxed">
+                Acepto los{" "}
+                <Link 
+                  href="/legal?tab=terms" 
+                  className="underline hover:text-dark-900 transition-colors"
+                  target="_blank"
+                >
+                  Términos y Condiciones
+                </Link>
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                name="privacy_accepted"
+                required
+                className="mt-0.5 h-4 w-4 rounded border-light-300 text-dark-900 focus:ring-dark-900 focus:ring-2"
+              />
+              <span className="text-footnote text-dark-700 font-roboto leading-relaxed">
+                Acepto la{" "}
+                <Link 
+                  href="/legal?tab=privacy" 
+                  className="underline hover:text-dark-900 transition-colors"
+                  target="_blank"
+                >
+                  Política de Privacidad
+                </Link>
+                {" "}y autorizo el tratamiento de mis datos personales
+              </span>
+            </label>
+          </div>
+        )}
+          <Button
           type="submit" fullWidth
         >
           {mode === "sign-in" ? "Iniciar Sesion" : "Crear Cuenta"}
         </Button>
-
-        {mode === "sign-up" && (
-          <p className="text-center text-footnote text-dark-700 font-roboto">
-            Al registrarte, aceptas nuestros{" "}
-            <a href="#" className="underline hover:text-dark-900 transition-colors">
-              Términos de servicio
-            </a>{" "}
-            y{" "}
-            <a href="#" className="underline hover:text-dark-900 transition-colors">
-              Política de privacidad
-            </a>
-          </p>
-        )}
       </form>
     </div>
   );

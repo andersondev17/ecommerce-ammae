@@ -55,7 +55,7 @@ export default function SizePicker({
       </button>
       {showGuide && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowGuide(false)}>
-          <Image src="/policy/sizeGuide.jpeg" alt="Size Guide" className="max-w-2xl w-full rounded-lg" />
+          <Image src="/policy/sizeGuide.jpeg" alt="Size Guide" width={600} height={600} className="max-w-2xl w-full rounded-lg" />
         </div>
       )}
     </div>

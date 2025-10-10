@@ -12,7 +12,7 @@ export const payments = pgTable('payments', {
   method: paymentMethodEnum('method').notNull(),
   status: paymentStatusEnum('status').notNull().default('initiated'),
   paidAt: timestamp('paid_at'),
-  transactionId: text('transaction_id'),
+  transactionId: text('transaction_id').unique(),
 });
 
 export const paymentsRelations = relations(payments, ({ one }) => ({

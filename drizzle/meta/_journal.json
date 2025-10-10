@@ -15,6 +15,13 @@
       "when": 1757449892092,
       "tag": "0001_tired_echo",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1760119538837,
+      "tag": "0002_puzzling_thunderbird",
+      "breakpoints": true
     }
   ]
 }

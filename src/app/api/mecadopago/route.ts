@@ -1,31 +1,40 @@
-import { createOrder } from "@/lib/actions/order";
 import { db } from "@/lib/db";
-import { payments } from "@/lib/db/schema/payments";
+import { orderItems, orders, payments, productVariants } from "@/lib/db/schema";
 import { mercadopago } from "@/lib/payments/mercadopagoClient";
+import { PaymentResponse } from "@/types/payments/types";
 import { createHmac, timingSafeEqual } from "crypto";
-import { and, eq, or } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { Payment } from "mercadopago";
 import { NextRequest, NextResponse } from "next/server";
+
+type MPPayment = PaymentResponse;
 
 interface WebhookPayload {
     action: string;
     data: { id: string };
     type: string;
 }
-interface MercadopagoPaymentResponse {
-    body?: MPPayment;
-    id?: string;
+interface MPPaymentGetResponse {
+    id?: string | number;
     status?: string;
-}
-
-interface MPPayment {
-    id: string;
-    status: string;
     external_reference?: string;
-    metadata?: Record<string, unknown>;
+    transaction_amount?: number;
+    currency_id?: string;
+    metadata?: {
+        cartId?: string;
+        orderId?: string;
+        userId?: string;
+        items?: string;
+        integration_type?: string;
+        platform?: string;
+        created_at?: string;
+    };
+    payer?: {
+        id?: string;
+        email?: string;
+    };
 }
-
-const STATUS_MAP: Record<string, string> = {
+const STATUS_MAP: Record<string, 'paid' | 'pending' | 'failed'> = {
     'approved': 'paid',
     'authorized': 'paid',
     'pending': 'pending',
@@ -37,16 +46,8 @@ const STATUS_MAP: Record<string, string> = {
     'charged_back': 'failed'
 };
 
-function validateMPSignature(params: {
-    dataId: string;
-    xRequestId: string;
-    xSignature: string;
-    secret: string;
-}): boolean {
-    const { dataId, xRequestId, xSignature, secret } = params;
-
+function validateMPSignature(dataId: string, xRequestId: string, xSignature: string, secret: string): boolean {
     try {
-        // Parse signature: "ts=1742505638683,v1=hash..."
         const parts = xSignature.split(',');
         const ts = parts.find(p => p.startsWith('ts='))?.split('=')[1];
         const hash = parts.find(p => p.startsWith('v1='))?.split('=')[1];
@@ -59,171 +60,148 @@ function validateMPSignature(params: {
         // Build manifest according to MP official docs
         const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
         // Compute HMAC-SHA256
-        const expectedHash = createHmac('sha256', secret).update(manifest).digest('hex');
+        const expectedHash = createHmac('sha256', secret.trim()).update(manifest).digest('hex');
 
         const signatureBuffer = Buffer.from(hash, 'hex');
         const expectedBuffer = Buffer.from(expectedHash, 'hex');
 
-        if (signatureBuffer.length !== expectedBuffer.length) {
-            console.error('[MP Webhook] Signature length mismatch');
-            return false;
-        }
-        // Timing-safe comparison
-        return timingSafeEqual(signatureBuffer, expectedBuffer);
-
-    } catch (error) {
-        console.error('[MP Webhook] Signature validation error:', error);
+        return signatureBuffer.length === expectedBuffer.length && timingSafeEqual(signatureBuffer, expectedBuffer);
+    } catch {
         return false;
     }
 }
 
 async function fetchPaymentDetails(paymentId: string): Promise<MPPayment | null> {
     try {
-        const response = await new Payment(mercadopago).get({ id: paymentId });
-
-        // El SDK puede retornar en .body o directamente
-        const payment = (response as MercadopagoPaymentResponse).body || response;
-
-        if (!payment.id || !payment.status) {
-            console.error('[MP Webhook] Invalid payment structure:', payment);
+        const response = await new Payment(mercadopago).get({ id: paymentId }) as unknown as MPPaymentGetResponse;
+        
+        if (!response?.id || !response?.status) {
+            console.error('[MP] Invalid payment response structure:', { paymentId, hasId: !!response?.id, hasStatus: !!response?.status });
             return null;
         }
 
-        return payment as MPPayment;
-
+        return {
+            id: response.id,
+            status: response.status,
+            external_reference: response.external_reference,
+            transaction_amount: response.transaction_amount,
+            currency_id: response.currency_id,
+            metadata: response.metadata,
+            payer: response.payer
+        };
     } catch (error) {
-        console.error('[MP Webhook] Error fetching payment:', error);
+        console.error('[MP] Error fetching payment:', error);
         return null;
     }
 }
 
+async function processPayment(orderId: string, paymentId: string, status: 'paid' | 'pending' | 'failed'): Promise<void> {
+    const statusConfig = {
+        paid: { payment: { status: "completed" as const, transactionId: paymentId, paidAt: new Date() }, order: "paid" as const },
+        pending: { payment: { status: "initiated" as const, transactionId: paymentId }, order: "pending" as const },
+        failed: { payment: { status: "failed" as const, transactionId: paymentId }, order: "cancelled" as const }
+    };
+
+    const config = statusConfig[status];
+
+    await db.transaction(async (tx) => {
+        const [currentOrder] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).for('update');
+        if (!currentOrder) throw new Error('Order not found');
+
+        // Idempotency via constraint
+        try {
+            await tx.insert(payments).values({
+                orderId,
+                method: "mercadopago",
+                ...config.payment
+            });
+        } catch (error) {
+            // if a webhook is called multiple times for same payment
+            if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
+                console.log(`[MP Webhook] Payment already exists for order ${orderId}, skipping`);
+                return;
+            }
+
+            console.error(`[MP Webhook] Database error creating payment for order ${orderId}:`, {
+                error: error instanceof Error ? error.message : error,
+                orderId,
+                paymentId
+            });
+            throw error;
+        }
+
+        await tx.update(orders).set({ status: config.order }).where(eq(orders.id, orderId));
+
+        if (status === 'paid' && currentOrder.status !== 'paid') {
+            const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+            for (const item of items) {
+                // Stock validation
+                const [variant] = await tx.select({ inStock: productVariants.inStock })
+                    .from(productVariants)
+                    .where(eq(productVariants.id, item.productVariantId))
+                    .for('update');
+
+                if (!variant || variant.inStock < item.quantity) {
+                    throw new Error(`Out of stock: ${item.productVariantId}`);
+                }
+
+                await tx.update(productVariants)
+                    .set({ inStock: sql`${productVariants.inStock} - ${item.quantity}` })
+                    .where(eq(productVariants.id, item.productVariantId));
+            }
+        }
+
+        if (status === 'failed' && currentOrder.status === 'paid') {
+            const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+            for (const item of items) {
+                await tx.update(productVariants)
+                    .set({ inStock: sql`${productVariants.inStock} + ${item.quantity}` })
+                    .where(eq(productVariants.id, item.productVariantId));
+            }
+        }
+    });
+}
+
+
 export async function POST(req: NextRequest) {
-    const startTime = Date.now();
     const xSignature = req.headers.get('x-signature');
     const xRequestId = req.headers.get('x-request-id');
     const url = new URL(req.url);
     const type = url.searchParams.get('type');
     const dataId = url.searchParams.get('data.id');
 
-    // Skip non-payment notifications
-    if (type !== 'payment') {
-        console.log(`[MP Webhook] Skipping ${type} notification`);
-        return new Response('received', { status: 200 });
-    }
+    if (type !== 'payment') return new Response('received', { status: 200 });
 
     const secret = process.env.MP_WEBHOOK_SECRET;
-    if (!secret) {
-        console.error('[MP Webhook] MP_WEBHOOK_SECRET not configured');
-        return new Response('Server misconfiguration', { status: 200 });
+    if (!secret || !xSignature || !xRequestId || !dataId) {
+        return new Response(!secret ? 'Server error' : 'Bad request', { status: !secret ? 500 : 400 });
     }
-
-    if (!xSignature || !xRequestId || !dataId) {
-        console.error('[MP Webhook] Missing required headers/params');
-        return new Response('Bad Request', { status: 200 });
-    }
-
-    // Validate x signature
-    const isValid = validateMPSignature({
-        dataId,
-        xRequestId,
-        xSignature,
-        secret
-    });
-    if (!isValid) {
-        console.error(`[MP Webhook] Invalid signature for payment: ${dataId}`);
+    if (!validateMPSignature(dataId, xRequestId, xSignature, secret)) {
+        console.error('[MP] Invalid signature:', dataId);
         return new Response('Unauthorized', { status: 401 });
     }
-
-    console.log(`[MP Webhook] ✅ Signature validated for payment: ${dataId}`);
-
     try {
         //  Parse body
         const body = await req.json() as WebhookPayload;
         const paymentId = body?.data?.id;
         if (!paymentId || paymentId !== dataId) {
-            console.error('[MP Webhook] Payment ID mismatch');
-            return new Response('Invalid payload', { status: 200 });
+            return new Response('Invalid payload', { status: 400 });
         }
 
-        // Check if already processed
-        const existingPayment = await db
-            .select({ status: payments.status })
-            .from(payments)
-            .where(
-                and(
-                    eq(payments.transactionId, paymentId),
-                    or(
-                        eq(payments.status, "completed"),
-                        eq(payments.status, "failed")
-                    )
-                )
-            )
-            .limit(1);
-
-        if (existingPayment.length) {
-            console.log(`[MP Webhook] Payment ${paymentId} already processed (${existingPayment[0].status})`);
-            return NextResponse.json(
-                { received: true, already_processed: true },
-                { status: 200 }
-            );
+        const payment = await fetchPaymentDetails(paymentId);
+        if (!payment) {
+            return NextResponse.json({ received: false, error: 'Payment not found' }, { status: 200 });
         }
 
-        // Fetch payment details
-        const paymentDetails = await fetchPaymentDetails(paymentId);
-        if (!paymentDetails) {
-            return NextResponse.json(
-                { received: false, error: 'Payment not found' },
-                { status: 200 }
-            );
-        }
-
-        const orderId = paymentDetails.external_reference ?? paymentDetails.metadata?.cartId;
+        const orderId = payment.external_reference ?? payment.metadata?.orderId ?? payment.metadata?.cartId;
         if (!orderId || typeof orderId !== 'string') {
-            console.error('[MP Webhook] Missing order reference in payment');
-            return NextResponse.json(
-                { received: false, error: 'Missing order reference' },
-                { status: 200 }
-            );
+            return NextResponse.json({ received: false, error: 'Missing order reference' }, { status: 200 });
         }
 
-        const mappedStatus = STATUS_MAP[paymentDetails.status] || 'failed';
+        const mappedStatus = STATUS_MAP[payment.status || ''] || 'failed';
+        await processPayment(orderId, paymentId, mappedStatus);
 
-        // Process payment
-        if (mappedStatus === 'paid') {
-            await createOrder({
-                orderId,
-                paymentMethod: "mercadopago",
-                status: "paid",
-                transactionId: paymentDetails.id,
-                paidAt: new Date(),
-            });
-            console.log(`[MP Webhook] ✅ Order ${orderId} PAID (${Date.now() - startTime}ms)`);
-
-        } else if (mappedStatus === 'pending') {
-            await db
-                .update(payments)
-                .set({ status: "initiated" })
-                .where(eq(payments.orderId, orderId));
-            console.log(`[MP Webhook] ⏳ Order ${orderId} PENDING (${Date.now() - startTime}ms)`);
-
-        } else {
-            await db
-                .update(payments)
-                .set({ status: "failed" })
-                .where(eq(payments.orderId, orderId));
-            console.log(`[MP Webhook] ❌ Order ${orderId} FAILED: ${paymentDetails.status} (${Date.now() - startTime}ms)`);
-        }
-
-        // Return 200 OK (MP requirement to stop retries)
-        return NextResponse.json(
-            {
-                received: true,
-                payment_id: paymentId,
-                status: mappedStatus,
-                processing_time_ms: Date.now() - startTime
-            },
-            { status: 200 }
-        );
+        return NextResponse.json({ received: true, payment_id: paymentId, order_id: orderId, status: mappedStatus }, { status: 200 });
 
     } catch (error) {
         console.error('[MP Webhook] Processing error:', error);

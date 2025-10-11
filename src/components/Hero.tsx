@@ -37,7 +37,7 @@ export default function Hero({
                     </h1>
                     <Link
                         href={cta.href}
-                        className="inline-block text-sm text-white border-b border-white/40 hover:border-white transition-colors pb-1"
+                        className="inline-block text-base text-white border-b border-white hover:border-white transition-colors pb-1 shadow-md hover:shadow-lg  "
                     >
                         {cta.text}
                     </Link>

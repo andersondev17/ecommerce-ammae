@@ -2,11 +2,11 @@
 
 import { getCurrentUser, guestSession } from "@/lib/auth/actions";
 import { db } from "@/lib/db";
-import { addresses, cartItems, carts, guests, orderItems, orders, payments, productImages, productVariants, products } from "@/lib/db/schema";
+import { addresses, cartItems, carts, categories, guests, orderItems, orders, payments, productImages, productVariants, products, users } from "@/lib/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { createMercadoPagoPreference } from "../payments/mercadopagoClient";
 import { formatPrice } from "../utils";
-import { DbClient, mergeCarts } from "./cart";
+import { DbClient, invalidateCartCache, mergeCarts } from "./cart";
 
 // SAGA pattern to handle checkout
 async function getActiveCart() {
@@ -88,10 +88,12 @@ export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
                 salePrice: sql<number>`${productVariants.salePrice}::numeric`,
                 imageUrl: productImages.url,
                 productVariantId: cartItems.productVariantId,
+                categorySlug: categories.slug,
             })
             .from(cartItems)
             .innerJoin(productVariants, eq(cartItems.productVariantId, productVariants.id))
             .innerJoin(products, eq(productVariants.productId, products.id))
+            .leftJoin(categories, eq(products.categoryId, categories.id))
             .leftJoin(productImages, and(
                 eq(productImages.productId, products.id),
                 eq(productImages.isPrimary, true)
@@ -111,7 +113,7 @@ export async function handleCheckout(method: 'mercadopago' | 'whatsapp') {
         const total = subtotal + 0; // Shipping in COP
 
         return method === 'mercadopago'
-            ? handleMercadoPagoCheckout({ items, total, userId: user?.id, cartId: cart.id, userEmail: user?.email })
+            ? handleMercadoPagoCheckout({ items, total, userId: user?.id, cartId: cart.id, user })
             : handleWhatsAppCheckout({ items, total, userId: user?.id, cartId: cart.id });
 
     } catch (error) {
@@ -129,15 +131,27 @@ interface CheckoutItem {
     salePrice: number | null;
     imageUrl: string | null;
     productVariantId: string;
+    categorySlug: string | null;
 }
-async function handleMercadoPagoCheckout({ items, total, userId, cartId, userEmail }: {
+async function handleMercadoPagoCheckout({ items, total, userId, cartId, user }: {
     items: CheckoutItem[];
     total: number;
     userId?: string;
-    userEmail?: string;
+    user?: { id: string; email: string; name?: string | null; } | null;
     cartId: string;
 }) {
     let orderId: string | null = null;
+    const invalidItems = items.filter(item =>
+        !item.productName ||
+        !item.price ||
+        item.price <= 0 ||
+        !item.quantity
+    );
+
+    if (invalidItems.length > 0) {
+        console.error('[MP Checkout] Items inválidos:', invalidItems);
+        throw new Error('Productos sin información completa. Recarga el carrito.');
+    }
     try {
         const result = await db.transaction(async (tx) => {
             await validateStock(items, tx);
@@ -167,15 +181,75 @@ async function handleMercadoPagoCheckout({ items, total, userId, cartId, userEma
                 status: "initiated",
                 transactionId: `pref-${newOrder.id}`
             });
-            await tx.delete(cartItems).where(eq(cartItems.cartId, cartId));
 
             return newOrder;
         }); // If any step fails, everything is automatically rolled back.
 
         orderId = result.id;
+        const mpItems = items.map((item, index) => {
+            const itemPrice = Number(item.salePrice ?? item.price);
 
+            // Valida que el precio sea válido
+            if (isNaN(itemPrice) || itemPrice <= 0) {
+                throw new Error(`Precio inválido para ${item.productName}`);
+            }
+
+            return {
+                id: `item-${index}`,
+                title: item.productName.slice(0, 100), // MP limita a 100 chars
+                quantity: item.quantity,
+                unit_price: itemPrice,
+                currency_id: "COP",
+                picture_url: item.imageUrl || undefined,
+            };
+        });
+
+        console.log('[MP Checkout] Items enviados a MP:', mpItems.map(i => ({
+            title: i.title,
+            price: i.unit_price,
+            quantity: i.quantity,
+            currency_id: i.currency_id,
+            
+        })));
+        
+        // Obtener dirección del usuario si existe
+        const userAddress = userId ? await db
+            .select()
+            .from(addresses)
+            .where(and(
+                eq(addresses.userId, userId),
+                eq(addresses.isDefault, true)
+            ))
+            .limit(1) : [];
+        
+        const address = userAddress[0];
+        
+        // Obtener datos completos del usuario desde BD para calidad MP
+        let userEmail = user?.email;
+        
+        if (userId) {
+            const [dbUser] = await db
+                .select({ 
+                    email: users.email, 
+                    name: users.name,
+                })
+                .from(users)
+                .where(eq(users.id, userId))
+                .limit(1);
+            
+            if (!userEmail) {
+                userEmail = dbUser?.email;
+                console.log('[Checkout] Email obtenido de DB:', userEmail);
+            }
+        }
+        
+        // Separar nombre completo en firstName y lastName
+        const nameParts = user?.name?.split(' ') || [];
+        const firstName = nameParts[0] || userEmail?.split('@')[0] || undefined;
+        const lastName = nameParts.slice(1).join(' ') || undefined;
+        
         // 4. Create Mercado Pago preference (outside the transaction)
-        const checkoutUrl = await createMercadoPagoPreference({
+        const { initPoint, preferenceId } = await createMercadoPagoPreference({
             cartId: result.id,
             userId: userId,
             userEmail: userEmail,
@@ -184,7 +258,18 @@ async function handleMercadoPagoCheckout({ items, total, userId, cartId, userEma
                 name: item.productName,
                 price: Number(item.salePrice ?? item.price),
                 quantity: item.quantity,
+                category_id: item.categorySlug || "others",
+                description: item.productName,
+                picture_url: item.imageUrl || undefined,
             })),
+            // Campos para calidad MP
+            firstName,
+            lastName,
+            address: address ? {
+                street_name: address.line1 || undefined,
+                street_number: (address.line2 ?? '').match(/\d+/)?.[0] || undefined,
+                zip_code: address.postalCode || undefined,
+            } : undefined,
         });
         console.log('Items para MP:', items.map(item => ({
             name: item.productName,
@@ -192,7 +277,16 @@ async function handleMercadoPagoCheckout({ items, total, userId, cartId, userEma
             type: typeof Number(item.salePrice ?? item.price)
         })));
 
-        return { success: true, checkoutUrl, orderId: result.id };
+        // Actualiza el registro de pago con el preference_id para trazabilidad
+        await db.update(payments)
+            .set({ transactionId: preferenceId })
+            .where(eq(payments.orderId, result.id));
+
+        // Limpiar carrito  después de crear la preferencia exitosamente
+        await db.delete(cartItems).where(eq(cartItems.cartId, cartId));
+        await invalidateCartCache(cartId);
+
+        return { success: true, checkoutUrl: initPoint, orderId: result.id };
 
     } catch (error) {
         console.error('[MP Checkout] Error:', error);
@@ -247,6 +341,7 @@ async function handleWhatsAppCheckout({ items, total, userId, cartId }: {
                 transactionId: `WA-${newOrder.id}`,
             });
             await tx.delete(cartItems).where(eq(cartItems.cartId, cartId));
+            await invalidateCartCache(cartId);
             return newOrder;
         });
 

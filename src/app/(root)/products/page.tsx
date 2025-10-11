@@ -6,6 +6,17 @@ import { parseFilterParams } from "@/lib/utils/query";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
+export async function generateMetadata({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const sp = await searchParams;
+  const categories = sp.category ? (Array.isArray(sp.category) ? sp.category : [sp.category]) : [];
+  const title = categories.length ? `Productos de ${categories.join(", ")}` : "Todos los productos";
+  const description = categories.length
+    ? `Descubre nuestros productos de ${categories.join(", ")}. Filtra por talla, color y precio.`
+    : "Lo último en moda para dama y hombre. Descubre todos nuestros productos.";
+
+  return { title, description };
+}
+
 export default async function ProductsPage({
   searchParams,
 }: {
@@ -43,16 +54,16 @@ export default async function ProductsPage({
 
 
       {activeBadges.length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-2 p-8">
+        <ul className="mb-4 flex flex-wrap gap-2 p-8">
           {activeBadges.map((b, i) => (
-            <span
+            <li
               key={`${b}-${i}`}
               className="rounded-full border border-light-300 px-3 py-1 text-caption text-dark-900 font-roboto p-4"
             >
               {b}
-            </span>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
       <div className="sticky top-10 md:top-16 z-20 bg-white/98 backdrop-blur-md py-4 px-8">
@@ -83,6 +94,7 @@ export default async function ProductsPage({
                     title={p.name}
                     subtitle={p.subtitle ?? undefined}
                     imageSrc={p.imageUrl ?? "/shoes/shoe-1.jpg"}
+                    imageAlt={p.name}
                     price={price}
                     href={`/products/${p.id}`}
                   />

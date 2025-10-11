@@ -11,10 +11,10 @@ export default function NotFound() {
                         <AlertTriangle className="h-16 w-16 text-red" />
                     </div>
                     <h1 className="text-heading-2 text-dark-900 font-roboto-slab">
-                        Página no encontrada
+                        Algo salió mal
                     </h1>
                     <p className="text-body text-dark-700 font-roboto">
-                        Lo sentimos, no pudimos encontrar la página que buscas.
+                        Lo sentimos, algo salió mal.
                     </p>
                 </div>
                 <Link

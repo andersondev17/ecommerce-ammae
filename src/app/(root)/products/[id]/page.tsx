@@ -3,16 +3,25 @@ import ProductActions from "@/components/ProductActions";
 import { getProduct, getProductReviews, getRecommendedProducts, type RecommendedProduct, type Review } from "@/lib/actions/product";
 import { formatCategory } from "@/lib/utils";
 import { Star } from "lucide-react";
-import { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
 type GalleryVariant = { color: string; images: string[] };
 
-export const metadata: Metadata = {
-  title: "Product Details",
-  description: "View product details and add to cart",
-};
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const data = await getProduct(id);
+
+  if (!data)
+    return { title: "Product Details", description: "View product details and add to cart" };
+
+  return {
+    title: data.product.name,
+    description: data.product.description.slice(0, 150),
+  };
+}
+
+
 function formatPrice(price: number | null | undefined) {
   if (price === null || price === undefined) return undefined;
   return new Intl.NumberFormat("es-CO", {
@@ -235,7 +244,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             isSticky
           />
           <AlsoLikeSection productId={product.id} />
-        </div> 
+        </div>
       </Suspense>
     </main>
   );

@@ -11,8 +11,9 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "AMMAE",
-  description: "Tienda Virtual para AMMAE zapatos, jeans, y ropa juvenil",
+  title: "AMMAE Colombia | Tienda Multimarca",
+  description: "Descubre la nueva colección de de AMMAE online. Las últimas tendencias en prendas urbanas para dama y hombre",
+  metadataBase: new URL("https://ammae.com.co"),
 };
 
 export default function RootShell({

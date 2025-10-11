@@ -54,12 +54,13 @@ export async function getOrder(orderId: string) {
 
 export async function updateOrderStatus(
     orderId: string,
-    status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled'
+    status: 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled',
+    isSystemOperation = false 
 ) {
     const user = await getCurrentUser();
 
     // Solo admin o sistema pueden cambiar estados
-    if (!user?.id) {
+    if (!user?.id && !isSystemOperation) {
         return { success: false, error: "Unauthorized" };
     }
     try {

@@ -17,32 +17,71 @@ interface CheckoutItem {
     name: string;
     price: number;
     quantity: number;
+    category_id?: string;
+    description?: string;
+    picture_url?: string;
 }
 
 interface PreferenceParams {
     cartId: string;
     userId?: string;
-    userEmail?: string;
+    userEmail?: string; //  para permitir usuarios invitados
     amount: number;
     items: CheckoutItem[];
+    // Campos opcionales
+    firstName?: string;
+    lastName?: string;
+    address?: {
+        street_name?: string;
+        street_number?: string;
+        zip_code?: string;
+    };
+    shippingCost?: number;
 }
 
-export async function createMercadoPagoPreference(params: PreferenceParams): Promise<string> {
-    const { cartId, userId, userEmail, amount, items } = params;
+export async function createMercadoPagoPreference(params: PreferenceParams): Promise<{ initPoint: string; preferenceId: string }> {
+    const {
+        cartId,
+        userId,
+        userEmail,
+        amount,
+        items,
+        firstName,
+        lastName,
+        address,
+        shippingCost
+    } = params;
 
     if (amount < MIN_AMOUNT_COP) {
         throw new Error(`Monto mínimo: COP $${MIN_AMOUNT_COP}`);
     }
-
+    if (!items || items.length === 0) {
+        throw new Error('No hay productos en el carrito');
+    }
+    for (const item of items) {
+        if (isNaN(item.price) || item.price <= 0) {
+            throw new Error(`Precio inválido para: ${item.name}`);
+        }
+        if (item.quantity <= 0) {
+            throw new Error(`Cantidad inválida para: ${item.name}`);
+        }
+    }
     const preference = new Preference(mercadopago);
 
-    const mpItems = items.map((item, index) => ({
-        id: `item-${index}`,
-        title: item.name,
-        quantity: item.quantity,
-        unit_price: item.price,
-        currency_id: "COP",
-    }));
+    const mpItems = items.map((item, index) => {
+        const unitPrice = Math.round(item.price);
+        const title = item.name.replace(/\s+/g, ' ').trim().slice(0, 100);
+        return {
+            id: `item-${index}`,
+            title,
+            quantity: item.quantity,
+            unit_price: unitPrice,
+            currency_id: "COP",
+            category_id: item.category_id || "others",
+            ...(item.description && { description: item.description.slice(0, 256) }),
+            ...(item.picture_url && { picture_url: item.picture_url }),
+        };
+    });
 
     if (mpItems.length === 0) {
         mpItems.push({
@@ -51,6 +90,7 @@ export async function createMercadoPagoPreference(params: PreferenceParams): Pro
             quantity: 1,
             unit_price: amount,
             currency_id: "COP",
+            category_id: "others",
         });
     }
 
@@ -61,11 +101,24 @@ export async function createMercadoPagoPreference(params: PreferenceParams): Pro
         const response = await preference.create({
             body: {
                 items: mpItems,
-                payer: userId && userEmail ? { email: userEmail } : undefined,
+                // Payer con campos opcionales
+                payer: {
+                    ...(userEmail && { email: userEmail }),
+                    ...(firstName && { first_name: firstName }),
+                    ...(lastName && { last_name: lastName }),
+                    ...(address && {
+                        address: {
+                            zip_code: address.zip_code,
+                            street_name: address.street_name,
+                            street_number: address.street_number
+                        }
+                    })
+                },
                 metadata: {
                     cartId,
                     userId: userId || null,
                     items: JSON.stringify(items),
+                    orderId: cartId,
                     integration_type: "checkout_pro",
                     platform: "nextjs",
                     created_at: now.toISOString()
@@ -88,12 +141,13 @@ export async function createMercadoPagoPreference(params: PreferenceParams): Pro
                     default_installments: 1
                 },
                 statement_descriptor: "AMMAE STORE",
-                additional_info: userEmail ? JSON.stringify({
-                    payer: {
-                        first_name: userEmail.split('@')[0],
-                        email: userEmail
+                binary_mode: false,
+                ...(shippingCost && shippingCost > 0 && {
+                    shipments: {
+                        cost: shippingCost,
+                        mode: "not_specified"
                     }
-                }) : undefined
+                })
             },
             requestOptions: {
                 idempotencyKey: cartId,
@@ -106,41 +160,23 @@ export async function createMercadoPagoPreference(params: PreferenceParams): Pro
 
         console.log(`✅ Preferencia MP creada: ${response.id} | Orden: ${cartId} | Monto: COP $${amount}`);
 
-        return response.init_point;
+        return { initPoint: response.init_point, preferenceId: response.id as string };
     } catch (error) {
         // Lógica simplificada para capturar el mensaje de error, priorizando el mensaje estándar, 
         // y luego buscando la propiedad 'message' en el objeto de error (común en APIs)
         const errorMessage = error instanceof Error
             ? error.message
-            : (error as { message?: string })?.message ?? 'Error desconocido en la comunicación con MP'; 
+            : (error as { message?: string })?.message ?? 'Error desconocido en la comunicación con MP';
 
         console.error('❌ Error creando preferencia MP:', {
             cartId,
             amount,
             error: errorMessage,
-            fullError: JSON.stringify(error) // Log el objeto completo para debugging
+            fullError: JSON.stringify(error)
         });
-
         // Relanza un error estándar con el mensaje útil
         throw new Error(
             `Error al procesar pago con Mercado Pago: ${errorMessage}`
         );
     }
 }
-
-export function validateMPCredentials(): boolean {
-    if (!MP_ACCESS_TOKEN) return false;
-
-    const isProduction = MP_ACCESS_TOKEN.startsWith('APP_USR');
-    const isTest = MP_ACCESS_TOKEN.startsWith('TEST');
-
-    if (!isProduction && !isTest) {
-        console.warn('⚠️ Token MP con formato inesperado');
-        return false;
-    }
-
-    console.log(`✅ Credenciales MP validadas (${isProduction ? 'PRODUCCIÓN' : 'TEST'})`);
-    return true;
-}
-
-validateMPCredentials();

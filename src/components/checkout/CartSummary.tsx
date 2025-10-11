@@ -4,7 +4,7 @@ import { handleCheckout, validateCheckoutRequirements } from "@/lib/actions/chec
 import { formatPrice } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/Button";
 
@@ -23,7 +23,7 @@ interface CartSummaryProps {
 }
 
 export function CartSummary({ items }: CartSummaryProps) {
-    const [isPending, startTransition] = useTransition();
+    const [pendingMethod, setPendingMethod] = useState<"mercadopago" | "whatsapp" | null>(null);
 
     const subtotal = items.reduce((sum, item) => {
         const price = item.salePrice ?? item.price;
@@ -34,42 +34,55 @@ export function CartSummary({ items }: CartSummaryProps) {
     const total = subtotal + shipping;
     const router = useRouter();
 
-    const handlePay = (method: "mercadopago" | "whatsapp") => {
-        startTransition(async () => {
-            try {
-                const validation = await validateCheckoutRequirements();
+    const handlePay = async (method: "mercadopago" | "whatsapp") => {
+        if (pendingMethod) return; // Prevenir doble click
 
-                if (!validation.success) {
-                    toast.error("Error al validar checkout");
-                    return;
-                }
+        setPendingMethod(method);
 
-                if (validation.requiresAuth) {
-                    toast.error("Debes iniciar sesión para continuar");
-                    router.push("/sign-in?redirect=/cart");
-                    return;
-                }
+        try {
+            const validation = await validateCheckoutRequirements();
 
-                if (validation.requiresAddress) {
-                    toast.error("Necesitas agregar una dirección de envío");
-                    router.push("/checkout/address");
-                    return;
-                }
+            if (!validation.success) {
+                toast.error("Error al validar checkout");
+                return;
+            }
 
-                console.log('Calling handleCheckout...');
-                const result = await handleCheckout(method);
-                console.log('Result:', result);
+            if (validation.requiresAuth) {
+                toast.error("Debes iniciar sesión para continuar");
+                router.push("/sign-in?redirect=/cart");
+                return;
+            }
 
-                if ('error' in result) {
-                    console.error('Checkout failed:', result.error);
-                    toast.error(result.error);
-                    return;
-                }
+            if (validation.requiresAddress) {
+                toast.error("Necesitas agregar una dirección de envío");
+                router.push("/checkout/address");
+                return;
+            }
+
+            const result = await handleCheckout(method);
+
+            if ('error' in result) {
+                console.error('Checkout failed:', result.error);
+
+                // Mejorar mensajes de error específicos
+                const errorMessage = result.error || "Error desconocido";
+                let friendlyMessage = errorMessage;
+
+                if (errorMessage.includes('Stock insuficiente'))
+                    friendlyMessage = "Algunos productos ya no están disponibles en la cantidad solicitada.";
+                else if (errorMessage.includes('MercadoPago'))
+                    friendlyMessage = "Error al procesar el pago. Verifica tus datos e intenta nuevamente.";
+                else if (errorMessage.includes('productos sin información'))
+                    friendlyMessage = "Error en el carrito. Recarga la página e intenta nuevamente.";
+
+                toast.error(friendlyMessage);
+                return;
+            }
 
                 if ('checkoutUrl' in result && result.checkoutUrl) {
                     console.log('Redirecting to:', result.checkoutUrl);
 
-                    // CAMBIO: Limpiar ANTES del redirect con timeout
+                    // Limpiar ANTES del redirect con timeout
                     const { clearAfterCheckout } = useCartStore.getState();
                     clearAfterCheckout();
 
@@ -88,7 +101,6 @@ export function CartSummary({ items }: CartSummaryProps) {
                 console.error("Checkout exception:", error);
                 toast.error("Error al iniciar el pago. Intenta nuevamente.");
             }
-        });
     };
 
 
@@ -114,17 +126,23 @@ export function CartSummary({ items }: CartSummaryProps) {
             </div>
 
             <div className="space-y-3">
-                <Button onClick={() => handlePay("mercadopago")} isLoading={isPending} fullWidth>
-                    Pagar con Mercado Pago
+                <Button
+                    onClick={() => handlePay("mercadopago")}
+                    isLoading={pendingMethod === "mercadopago"}
+                    disabled={!!pendingMethod}
+                    fullWidth
+                >
+                    {pendingMethod === "mercadopago" ? 'Procesando...' : 'Pagar con Mercado Pago'}
                 </Button>
 
                 <Button
                     onClick={() => handlePay("whatsapp")}
                     variant="secondary"
-                    isLoading={isPending}
+                    isLoading={pendingMethod === "whatsapp"}
+                    disabled={!!pendingMethod}
                     fullWidth
                 >
-                    Enviar por WhatsApp
+                    {pendingMethod === "whatsapp" ? 'Procesando...' : 'Enviar por WhatsApp'}
                 </Button>
             </div>
         </div>

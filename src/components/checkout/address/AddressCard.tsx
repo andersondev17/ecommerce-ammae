@@ -162,7 +162,7 @@ export function AddressForm({ initialData, onSave, onCancel, disabled }: Address
                                         {...field}
                                         autoFocus
                                         autoComplete="address-line1"
-                                        placeholder="Calle 123 #45-67"
+                                        placeholder="Escribe tu direccion"
                                         disabled={disabled}
                                     />
                                 </FormControl>

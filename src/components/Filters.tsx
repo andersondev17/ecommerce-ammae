@@ -21,8 +21,8 @@ const PRICES = [
   { id: "150-", label: "Over $150" },
 ] as const;
 const CATEGORIES = [
-   "jeans", "blusas", "vestidos",
-  "Camisetas", "hoodies"
+  "jeans", "blusas", "vestidos",
+  "Camisetas", "hoodies", "perfumes"
 ] as const;
 
 type GroupKey = "gender" | "size" | "color" | "price" | "category";

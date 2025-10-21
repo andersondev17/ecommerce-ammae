@@ -10,9 +10,9 @@ import { useEffect, useState } from "react";
 import UserSection from "./UserSection";
 
 const SUBCATEGORIES = {
-  men: ["jeans", "camisetas", "hoodies"],
-  women: ["jeans", "blusas", "vestidos", "hoodies"],
-  unisex: [ "hoodies"]
+  men: ["jeans", "camisetas", "hoodies","perfumes"],
+  women: ["jeans", "blusas", "vestidos", "hoodies","perfumes"],
+  unisex: [ "hoodies","perfumes"]
 } as const;
 
 const NAV_LINKS = [

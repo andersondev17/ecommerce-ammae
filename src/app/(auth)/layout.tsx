@@ -26,7 +26,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <p className="text-footnote text-light-400 font-roboto">© {new Date().getFullYear()} AMMAE. All rights reserved.</p>
+        <p className="text-footnote text-light-400 font-roboto">© {new Date().getFullYear()} AMMAE. Todos los derechos reservados.</p>
       </section>
 
       <section className="flex items-center justify-center px-4 py-10 sm:px-6 lg:px-8">

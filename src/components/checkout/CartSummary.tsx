@@ -4,7 +4,7 @@ import { handleCheckout, validateCheckoutRequirements } from "@/lib/actions/chec
 import { formatPrice } from "@/lib/utils";
 import { useCartStore } from "@/store/cart.store";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/Button";
 
@@ -25,10 +25,12 @@ interface CartSummaryProps {
 export function CartSummary({ items }: CartSummaryProps) {
     const [pendingMethod, setPendingMethod] = useState<"mercadopago" | "whatsapp" | null>(null);
 
-    const subtotal = items.reduce((sum, item) => {
-        const price = item.salePrice ?? item.price;
-        return sum + (price * item.quantity);
-    }, 0);
+    const subtotal = useMemo(() => (
+        items.reduce((sum, item) => {
+          const price = item.salePrice ?? item.price;
+          return sum + price * item.quantity;
+        }, 0)
+      ), [items]);
 
     const shipping = 0;
     const total = subtotal + shipping;
@@ -48,14 +50,28 @@ export function CartSummary({ items }: CartSummaryProps) {
             }
 
             if (validation.requiresAuth) {
-                toast.error("Debes iniciar sesión para continuar");
-                router.push("/sign-in?redirect=/cart");
+                toast.error("Debes iniciar sesión para continuar", {
+                    duration: Infinity,
+                    position: "bottom-center",
+                    action: {
+                        label: "Iniciar Sesión",
+                        onClick: () => router.push("/sign-in?redirect=/cart")
+                    }
+                });
+                setPendingMethod(null);
                 return;
             }
 
             if (validation.requiresAddress) {
-                toast.error("Necesitas agregar una dirección de envío");
-                router.push("/checkout/address");
+                toast.error("Necesitas agregar una dirección de envío", {
+                    duration: Infinity,
+                    position: "top-center",
+                    action: {
+                        label: "Agregar Dirección",
+                        onClick: () => router.push("/checkout/address")
+                    }
+                });
+                setPendingMethod(null);
                 return;
             }
 
@@ -101,6 +117,9 @@ export function CartSummary({ items }: CartSummaryProps) {
                 console.error("Checkout exception:", error);
                 toast.error("Error al iniciar el pago. Intenta nuevamente.");
             }
+            finally {
+                setPendingMethod(null);
+             }
     };
 
 

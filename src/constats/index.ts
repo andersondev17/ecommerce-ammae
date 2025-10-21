@@ -20,3 +20,18 @@ export const INFO_ITEMS = [
         content: "Para solicitar cambios o devoluciones, contacta a servicioammae@gmail.com dentro de los 5 días hábiles. Evaluaremos cada caso individualmente."
     }
 ];
+
+export const CATEGORY_VISUALS = {
+    perfumes: {
+        image: "/perfumes/bannerPerfumes.png",
+        title: "Fragancias",
+        description: "Esencias que cuentan historias",
+        color: "from-amber-700/90 via-rose-900/60"
+    },
+    jeans: {
+        image: "/jeans/bannerDemin.png",
+        title: "Denim",
+        description: "El clásico reinventado",
+        color: "from-indigo-800/90 via-sky-900/50"
+    },
+};

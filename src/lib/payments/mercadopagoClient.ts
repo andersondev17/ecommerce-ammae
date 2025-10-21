@@ -97,6 +97,13 @@ export async function createMercadoPagoPreference(params: PreferenceParams): Pro
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
+    console.log('🚀 Creating MP preference:', {
+        itemsCount: mpItems.length,
+        totalAmount: amount,
+        userEmail,
+        hasPayer: !!userEmail,
+        environment: process.env.NODE_ENV
+    });
     try {
         const response = await preference.create({
             body: {

@@ -22,7 +22,7 @@ const PRICES = [
 ] as const;
 const CATEGORIES = [
   "jeans", "blusas", "vestidos",
-  "Camisetas", "hoodies", "perfumes"
+  "Camisetas", "perfumes"
 ] as const;
 
 type GroupKey = "gender" | "size" | "color" | "price" | "category";

@@ -10,17 +10,15 @@ import { useEffect, useState } from "react";
 import UserSection from "./UserSection";
 
 const SUBCATEGORIES = {
-  men: ["jeans", "camisetas", "hoodies","perfumes"],
-  women: ["jeans", "blusas", "vestidos", "hoodies","perfumes"],
-  unisex: [ "hoodies","perfumes"]
+  men: ["jeans", "camisetas","perfumes"],
+  women: ["jeans", "blusas", "vestidos","perfumes"],
+  unisex: [ "perfumes"]
 } as const;
 
 const NAV_LINKS = [
   { label: "Hombre", href: "/products?gender=men", hasSubmenu: true, genderValue: "men" },
   { label: "Mujer", href: "/products?gender=women", hasSubmenu: true, genderValue: "women" },
   { label: "Unisex", href: "/products?gender=unisex", hasSubmenu: true, genderValue: "unisex" },
-  { label: "Colecciones", href: "/collections", hasSubmenu: false },
-  { label: "Contacto", href: "/contact", hasSubmenu: false },
 ] as const;
 
 const FEATURED_IMAGE = "/featured.jpg";

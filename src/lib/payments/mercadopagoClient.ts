@@ -131,9 +131,9 @@ export async function createMercadoPagoPreference(params: PreferenceParams): Pro
                     created_at: now.toISOString()
                 },
                 back_urls: {
-                    success: `${APP_URL}/checkout/success`,
+                    success: `${APP_URL}/checkout/success?order_id=${cartId}`,
                     failure: `${APP_URL}/cart?error=payment_failed`,
-                    pending: `${APP_URL}/checkout/success`
+                    pending: `${APP_URL}/checkout/success?order_id=${cartId}&status=pending`
                 },
                 //auto_return: "approved",
                 notification_url: `${APP_URL}/api/mercadopago`,

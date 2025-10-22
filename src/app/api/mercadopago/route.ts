@@ -3,7 +3,7 @@ import { orderItems, orders, payments, productVariants } from "@/lib/db/schema";
 import { mercadopago } from "@/lib/payments/mercadopagoClient";
 import { PaymentResponse } from "@/types/payments/types";
 import { createHmac, timingSafeEqual } from "crypto";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { Payment } from "mercadopago";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -108,51 +108,65 @@ async function processPayment(orderId: string, paymentId: string, status: 'paid'
         const [currentOrder] = await tx.select({ status: orders.status }).from(orders).where(eq(orders.id, orderId)).for('update');
         if (!currentOrder) throw new Error('Order not found');
 
-        // Idempotency via constraint
-        try {
+        // Idempotency: Check if payment exists, create or update accordingly
+        const [existingPayment] = await tx.select()
+            .from(payments)
+            .where(eq(payments.orderId, orderId))
+            .limit(1);
+
+        if (!existingPayment) {
             await tx.insert(payments).values({
                 orderId,
                 method: "mercadopago",
                 ...config.payment
             });
-        } catch (error) {
-            // if a webhook is called multiple times for same payment
-            if (error && typeof error === 'object' && 'code' in error && error.code === '23505') {
-                console.log(`[MP Webhook] Payment already exists for order ${orderId}, skipping`);
-                return;
-            }
-
-            console.error(`[MP Webhook] Database error creating payment for order ${orderId}:`, {
-                error: error instanceof Error ? error.message : error,
-                orderId,
-                paymentId
-            });
-            throw error;
+        } else {
+            // Update existing payment (second webhook may have updated status)
+            await tx.update(payments)
+                .set(config.payment)
+                .where(eq(payments.orderId, orderId));
         }
 
+        // CRITICAL: This ALWAYS executes, even on duplicate webhooks
         await tx.update(orders).set({ status: config.order }).where(eq(orders.id, orderId));
+        console.log(`[MP Webhook] Order ${orderId} updated to status: ${config.order}`);
 
         if (status === 'paid' && currentOrder.status !== 'paid') {
             const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+
+            if (items.length === 0) return;
+
+            // Batch: Lock todos los variants de una vez
+            const variantIds = items.map(i => i.productVariantId);
+            const variants = await tx.select()
+                .from(productVariants)
+                .where(inArray(productVariants.id, variantIds))
+                .for('update');
+
+            // Validar stock en memoria (no DB calls)
+            const stockMap = new Map(variants.map(v => [v.id, v.inStock]));
             for (const item of items) {
-                // Stock validation
-                const [variant] = await tx.select({ inStock: productVariants.inStock })
-                    .from(productVariants)
-                    .where(eq(productVariants.id, item.productVariantId))
-                    .for('update');
-
-                if (!variant || variant.inStock < item.quantity) {
-                    throw new Error(`Out of stock: ${item.productVariantId}`);
+                const stock = stockMap.get(item.productVariantId);
+                if (!stock || stock < item.quantity) {
+                    throw new Error(`Insufficient stock: ${item.productVariantId}`);
                 }
+            }
 
+            // Batch: Update todos los variants (SQL optimizado)
+            for (const item of items) {
                 await tx.update(productVariants)
                     .set({ inStock: sql`${productVariants.inStock} - ${item.quantity}` })
                     .where(eq(productVariants.id, item.productVariantId));
             }
+            console.log(`[MP Webhook] Stock decreased for order ${orderId} (${items.length} items)`);
         }
 
         if (status === 'failed' && currentOrder.status === 'paid') {
             const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+
+            if (items.length === 0) return;
+
+            // Batch: Update todos los variants para rollback de stock
             for (const item of items) {
                 await tx.update(productVariants)
                     .set({ inStock: sql`${productVariants.inStock} + ${item.quantity}` })

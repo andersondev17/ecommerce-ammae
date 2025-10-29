@@ -92,7 +92,7 @@ export default function ProductActions({
           <>
             <div className="flex-1 min-w-0">
               <p className="text-xs md:text-sm font-light tracking-wide  font-roboto-slab">{productName ? `${productName} ` : ""}</p>
-              <p className="text-[13px] uppercase tracking-[0.1em] font-light text-dark-900 font-roboto-slab">${price}</p>
+              <p className="text-[13px] uppercase tracking-[0.1em] font-light text-dark-900 font-roboto-slab">{price !== null ? `$${price}` : 'Precio no disponible'}</p>
             </div>
             <div className="flex items-center gap-2">
               <SizePicker productId={productId} variants={variants}  compact />
